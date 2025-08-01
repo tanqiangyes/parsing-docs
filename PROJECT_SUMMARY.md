@@ -69,7 +69,6 @@ docs-parser/
 │   └── utils/             # 工具函数
 ├── examples/              # 使用示例
 ├── tests/                 # 测试文件
-└── config.json           # 配置文件
 ```
 
 ### 支持的格式详情

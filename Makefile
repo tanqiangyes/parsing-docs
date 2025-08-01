@@ -141,7 +141,6 @@ release: build-all
 	@cp $(BUILD_DIR)/* release/
 	@cp README.md release/
 	@cp LICENSE release/ 2>/dev/null || echo "LICENSE 文件不存在"
-	@cp examples/config.json release/
 	@echo "发布包已创建: release/"
 
 # 显示帮助信息
