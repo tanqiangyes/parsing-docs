@@ -14,10 +14,12 @@
 
 ### 核心功能
 - **精确解析**: 深度解析Word文档的所有格式规则和内容结构
-- **格式比较**: 与模板或参考文档进行详细的格式对比
+- **Word文档模板比较**: 与Word文档模板进行详细的格式对比
 - **自动标注**: 在复制的文档中直接标注格式问题
 - **修改建议**: 提供具体的格式修改建议和操作步骤
 - **合规检查**: 验证文档是否符合指定的格式标准
+- **高级样式解析**: 支持样式继承、主题样式、条件样式
+- **图形解析**: 支持图片、形状、图表、SmartArt等图形元素
 
 ## 📦 安装
 
@@ -40,32 +42,36 @@ go mod tidy
 
 3. **编译项目**
 ```bash
+# Windows
 go build -o docs-parser.exe cmd/main.go
+
+# Linux/macOS
+go build -o docs-parser cmd/main.go
 ```
 
 ## 🛠️ 使用方法
 
 ### 命令行工具
 
-#### 比较文档与模板
+#### 比较文档与Word模板
 ```bash
-# 比较文档与模板
-./docs-parser.exe compare --document sample.docx --template template.json
+# 比较文档与Word文档模板
+./docs-parser.exe compare document.docx template.docx
 
-# 比较两个文档
-./docs-parser.exe compare --document1 doc1.docx --document2 doc2.docx
+# 如果格式相同，显示"格式相同"
+# 如果格式不同，自动生成标注文档
 ```
 
-#### 验证文档格式
+#### 显示Word模板信息
 ```bash
-# 验证文档格式
-./docs-parser.exe validate --document sample.docx
+# 解析并显示Word文档模板的详细信息
+./docs-parser.exe template template.docx
 ```
 
-#### 为文档添加标注
+#### 解析Word文档
 ```bash
-# 为文档添加格式标注
-./docs-parser.exe annotate --input sample.docx --output annotated_sample.docx
+# 解析Word文档并显示基本信息
+./docs-parser.exe parse document.docx
 ```
 
 ### 编程接口
@@ -85,20 +91,25 @@ import (
 
 func main() {
     // 解析文档
-    doc, err := parser.ParseDocument("sample.docx")
+    docParser := parser.NewParser()
+    doc, err := docParser.ParseDocument("sample.docx")
     if err != nil {
         log.Fatal(err)
     }
     
-    // 比较文档与模板
-    result, err := comparator.CompareWithTemplate("sample.docx", "template.json")
+    // 比较文档与Word模板
+    docComparator := comparator.NewComparator()
+    result, err := docComparator.CompareWithTemplate("sample.docx", "template.docx")
     if err != nil {
         log.Fatal(err)
     }
     
     // 输出比较结果
-    fmt.Printf("合规率: %.2f%%\n", result.ComplianceRate)
-    fmt.Printf("发现问题: %d个\n", len(result.Issues))
+    if len(result.Issues) == 0 {
+        fmt.Println("格式相同")
+    } else {
+        fmt.Printf("发现 %d 个格式问题\n", len(result.Issues))
+    }
 }
 ```
 
@@ -113,28 +124,27 @@ import (
     
     "docs-parser/internal/core/comparator"
     "docs-parser/internal/core/annotator"
-    "docs-parser/internal/core/validator"
 )
 
 func main() {
     // 创建比较器
     comp := comparator.NewDocumentComparator()
     
-    // 比较文档
-    report, err := comp.CompareWithTemplate("document.docx", "template.json")
+    // 比较文档与Word模板
+    report, err := comp.CompareWithTemplate("document.docx", "template.docx")
     if err != nil {
         log.Fatal(err)
     }
     
     // 检查是否有格式差异
-    if report.OverallScore < 100.0 {
+    if len(report.Issues) > 0 {
         fmt.Println("发现格式差异，生成标注文档...")
         
         // 创建标注器
-        annotator := annotator.NewAnnotator()
+        docAnnotator := annotator.NewAnnotator()
         
         // 生成标注文档
-        err = annotator.AnnotateDocument("document.docx", "document_annotated.docx")
+        err = docAnnotator.AnnotateDocument("document.docx", "document_annotated.docx")
         if err != nil {
             log.Fatal(err)
         }
@@ -143,15 +153,6 @@ func main() {
     } else {
         fmt.Println("格式相同")
     }
-    
-    // 验证文档
-    validator := validator.NewValidator()
-    validationResult, err := validator.ValidateDocument("document.docx")
-    if err != nil {
-        log.Fatal(err)
-    }
-    
-    fmt.Printf("文档验证结果: 合规率 %.2f%%\n", validationResult.ComplianceRate)
 }
 ```
 
@@ -167,7 +168,9 @@ docs-parser/
 │   │   ├── parser/       # 解析器接口
 │   │   ├── comparator/   # 比较器实现
 │   │   ├── annotator/    # 标注器实现
-│   │   └── validator/    # 验证器实现
+│   │   ├── validator/    # 验证器实现
+│   │   ├── styles/       # 高级样式解析
+│   │   └── graphics/     # 图形解析
 │   ├── formats/          # 格式解析器
 │   │   ├── docx.go       # DOCX解析器
 │   │   ├── doc.go        # DOC解析器
@@ -184,10 +187,12 @@ docs-parser/
 │   ├── parser/           # 解析器API
 │   └── comparator/       # 比较器API
 ├── examples/             # 使用示例
-│   └── basic_usage.go
-├── docs/                 # 文档
+├── tests/                # 测试文件
+├── .cursor/              # 开发规范
 ├── go.mod
 ├── go.sum
+├── Makefile              # Unix构建脚本
+├── build.bat             # Windows构建脚本
 └── README.md
 ```
 
@@ -207,14 +212,9 @@ formats := parser.GetSupportedFormats() []string
 
 ### 比较器 (Comparator)
 
-#### 与模板比较
+#### 与Word模板比较
 ```go
 result, err := comparator.CompareWithTemplate(docPath, templatePath string) (*ComparisonReport, error)
-```
-
-#### 文档间比较
-```go
-result, err := comparator.CompareDocuments(doc1Path, doc2Path string) (*ComparisonReport, error)
 ```
 
 ### 标注器 (Annotator)
@@ -224,11 +224,11 @@ result, err := comparator.CompareDocuments(doc1Path, doc2Path string) (*Comparis
 err := annotator.AnnotateDocument(sourcePath, outputPath string) error
 ```
 
-### 验证器 (Validator)
+### 模板管理器 (TemplateManager)
 
-#### 验证文档
+#### 加载Word模板
 ```go
-result, err := validator.ValidateDocument(filePath string) (*ValidationResult, error)
+template, err := templateManager.LoadTemplate(templatePath string) (*Template, error)
 ```
 
 ## 📊 数据类型
@@ -240,6 +240,7 @@ type Document struct {
     Content     DocumentContent
     Styles      DocumentStyles
     FormatRules FormatRules
+    Graphics    DocumentGraphics
 }
 ```
 
@@ -259,12 +260,14 @@ type ComparisonReport struct {
 }
 ```
 
-### ValidationResult (验证结果)
+### Template (Word文档模板)
 ```go
-type ValidationResult struct {
-    ComplianceRate  float64
-    Issues          []ValidationIssue
-    Recommendations []Recommendation
+type Template struct {
+    ID           string
+    Name         string
+    SourcePath   string
+    FormatRules  FormatRules
+    Metadata     TemplateMetadata
 }
 ```
 
@@ -275,8 +278,8 @@ type ValidationResult struct {
 - 自动检测格式不一致的地方
 - 提供具体的修改建议
 
-### 2. 模板验证
-- 验证文档是否按照模板格式编写
+### 2. Word模板验证
+- 验证文档是否按照Word模板格式编写
 - 检查字体、段落、表格等格式要求
 - 生成详细的合规报告
 
@@ -316,30 +319,76 @@ type ValidationResult struct {
 - 页眉页脚设置
 - 分页符检查
 
+### 图形格式
+- 图片尺寸和格式
+- 形状样式和位置
+- 图表数据和样式
+- SmartArt布局
+
 ## 🚧 开发状态
 
 ### 已完成功能 ✅
 - [x] 基础架构设计
 - [x] 数据类型定义
 - [x] DOCX格式解析
+- [x] DOC格式解析
+- [x] RTF格式解析
+- [x] WPD格式解析
+- [x] 历史Word版本支持
 - [x] 文档比较功能
 - [x] 格式验证功能
 - [x] 文档标注功能
 - [x] 命令行工具
-- [x] 模板管理系统
+- [x] Word文档模板管理
+- [x] 高级样式解析
+- [x] 图形和图片解析
+- [x] 样式继承和主题支持
 
-### 开发中功能 🚧
-- [ ] 完整的历史格式支持
-- [ ] 高级样式解析
-- [ ] 批量处理优化
-- [ ] 性能优化
+### 技术特性 ✅
+- [x] 模块化架构设计
+- [x] 完整的错误处理
+- [x] 并发处理支持
+- [x] 内存优化
+- [x] 测试覆盖
+- [x] 构建脚本
 
-### 计划功能 📋
-- [ ] 图形和图片解析
-- [ ] 宏和脚本检测
-- [ ] 加密文档支持
-- [ ] Web界面
-- [ ] 插件系统
+## 🛠️ 构建和测试
+
+### 构建项目
+```bash
+# 使用Go构建
+go build ./cmd/main.go
+
+# 使用Makefile (Unix)
+make build
+
+# 使用批处理文件 (Windows)
+build.bat build
+```
+
+### 运行测试
+```bash
+# 运行所有测试
+go test ./...
+
+# 运行特定包的测试
+go test ./internal/core/comparator
+
+# 运行基准测试
+go test -bench=.
+```
+
+### 代码质量检查
+```bash
+# 格式化代码
+go fmt ./...
+
+# 代码检查
+go vet ./...
+
+# 使用Makefile
+make check
+```
 
 ## 🤝 贡献指南
 
@@ -355,18 +404,6 @@ type ValidationResult struct {
 - 添加适当的注释和文档
 - 编写单元测试
 - 确保代码通过lint检查
-
-### 测试
-```bash
-# 运行所有测试
-go test ./...
-
-# 运行特定包的测试
-go test ./internal/core/comparator
-
-# 运行基准测试
-go test -bench=.
-```
 
 ## 📄 许可证
 
@@ -384,4 +421,4 @@ go test -bench=.
 
 ---
 
-**注意**: 本项目仍在积极开发中，API可能会有变化。建议在生产环境中使用前进行充分测试。 
+**注意**: 本项目已完成核心功能开发，支持Word文档的精确解析、比较和标注功能。建议在生产环境中使用前进行充分测试。 
