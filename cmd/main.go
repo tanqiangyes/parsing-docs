@@ -3,9 +3,9 @@ package main
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
-	"docs-parser/internal/core/annotator"
+	// "path/filepath"
+	// "docs-parser/internal/core/annotator"
 	"docs-parser/internal/templates"
 	pkgcomparator "docs-parser/pkg/comparator"
 	pkgparser "docs-parser/pkg/parser"
@@ -66,23 +66,33 @@ var compareCmd = &cobra.Command{
 			return
 		}
 
-		// 如果有格式问题，自动生成标注文档
-		fmt.Printf("发现 %d 个格式问题，正在生成标注文档...\n", len(report.Issues))
+		// 如果有格式问题，显示问题详情
+		fmt.Printf("发现 %d 个格式问题\n", len(report.Issues))
 
-		// 生成输出文件路径
-		ext := filepath.Ext(docPath)
-		baseName := docPath[:len(docPath)-len(ext)]
-		outputPath := baseName + "_annotated" + ext
+		// 暂时注释掉标注文档生成，专注于比较功能
+		/*
+			// 如果有格式问题，自动生成标注文档
+			fmt.Printf("发现 %d 个格式问题，正在生成标注文档...\n", len(report.Issues))
 
-		// 使用标注包生成标注文档
-		docAnnotator := annotator.NewAnnotator()
-		err = docAnnotator.AnnotateDocument(docPath, outputPath)
-		if err != nil {
-			fmt.Printf("生成标注文档失败: %v\n", err)
-			os.Exit(1)
-		}
+			// 生成输出文件路径
+			ext := filepath.Ext(docPath)
+			baseName := docPath[:len(docPath)-len(ext)]
+			outputPath := baseName + "_annotated" + ext
+			fmt.Printf("输出文件路径: %s\n", outputPath)
 
-		fmt.Printf("标注文档已生成: %s\n", outputPath)
+			// 使用标注包生成标注文档
+			fmt.Println("创建标注器...")
+			docAnnotator := annotator.NewAnnotator()
+			fmt.Println("开始标注文档...")
+			err = docAnnotator.AnnotateDocument(docPath, outputPath)
+			if err != nil {
+				fmt.Printf("生成标注文档失败: %v\n", err)
+				os.Exit(1)
+			}
+
+			fmt.Printf("标注文档已生成: %s\n", outputPath)
+		*/
+
 		fmt.Printf("对比完成，发现 %d 个格式问题\n", len(report.Issues))
 	},
 }

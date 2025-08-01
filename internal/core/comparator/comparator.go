@@ -254,6 +254,7 @@ func (dc *DocumentComparator) CompareStyles(docStyles, templateStyles *types.Doc
 func (dc *DocumentComparator) compareFontRules(docFonts, templateFonts []types.FontRule) []RuleComparison {
 	var comparisons []RuleComparison
 
+	// 检查模板中的每个字体规则
 	for _, templateFont := range templateFonts {
 		comparison := RuleComparison{
 			RuleID:   templateFont.ID,
@@ -269,6 +270,21 @@ func (dc *DocumentComparator) compareFontRules(docFonts, templateFonts []types.F
 				comparison.Compliant = dc.isFontCompliant(docFont, templateFont)
 				comparison.Score = dc.calculateFontScore(docFont, templateFont)
 				comparison.Differences = dc.getFontDifferences(docFont, templateFont)
+
+				// 如果不合规，生成问题
+				if !comparison.Compliant {
+					comparison.Issues = []FormatIssue{{
+						ID:          fmt.Sprintf("font_mismatch_%s", templateFont.ID),
+						Type:        IssueFont,
+						Severity:    SeverityMedium,
+						Location:    "document",
+						Description: fmt.Sprintf("Font rule mismatch: %s", templateFont.Name),
+						Expected:    templateFont,
+						Current:     docFont,
+						Rule:        "font_compliance",
+						Suggestions: []string{"Update font to match template requirements"},
+					}}
+				}
 				break
 			}
 		}
@@ -284,10 +300,45 @@ func (dc *DocumentComparator) compareFontRules(docFonts, templateFonts []types.F
 				Description: fmt.Sprintf("Missing required font: %s", templateFont.Name),
 				Expected:    templateFont,
 				Current:     nil,
+				Rule:        "font_required",
+				Suggestions: []string{"Add the required font to the document"},
 			}}
 		}
 
 		comparisons = append(comparisons, comparison)
+	}
+
+	// 检查文档中额外的字体规则
+	for _, docFont := range docFonts {
+		found := false
+		for _, templateFont := range templateFonts {
+			if docFont.ID == templateFont.ID {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			comparison := RuleComparison{
+				RuleID:    docFont.ID,
+				RuleName:  docFont.Name,
+				RuleType:  "font",
+				Compliant: false,
+				Score:     0.0,
+				Issues: []FormatIssue{{
+					ID:          fmt.Sprintf("font_extra_%s", docFont.ID),
+					Type:        IssueFont,
+					Severity:    SeverityLow,
+					Location:    "document",
+					Description: fmt.Sprintf("Extra font found: %s", docFont.Name),
+					Expected:    nil,
+					Current:     docFont,
+					Rule:        "font_extra",
+					Suggestions: []string{"Remove extra font or update template"},
+				}},
+			}
+			comparisons = append(comparisons, comparison)
+		}
 	}
 
 	return comparisons
@@ -296,6 +347,7 @@ func (dc *DocumentComparator) compareFontRules(docFonts, templateFonts []types.F
 func (dc *DocumentComparator) compareParagraphRules(docParagraphs, templateParagraphs []types.ParagraphRule) []RuleComparison {
 	var comparisons []RuleComparison
 
+	// 检查模板中的每个段落规则
 	for _, templatePara := range templateParagraphs {
 		comparison := RuleComparison{
 			RuleID:   templatePara.ID,
@@ -311,6 +363,21 @@ func (dc *DocumentComparator) compareParagraphRules(docParagraphs, templateParag
 				comparison.Compliant = dc.isParagraphCompliant(docPara, templatePara)
 				comparison.Score = dc.calculateParagraphScore(docPara, templatePara)
 				comparison.Differences = dc.getParagraphDifferences(docPara, templatePara)
+
+				// 如果不合规，生成问题
+				if !comparison.Compliant {
+					comparison.Issues = []FormatIssue{{
+						ID:          fmt.Sprintf("paragraph_mismatch_%s", templatePara.ID),
+						Type:        IssueParagraph,
+						Severity:    SeverityMedium,
+						Location:    "document",
+						Description: fmt.Sprintf("Paragraph rule mismatch: %s", templatePara.Name),
+						Expected:    templatePara,
+						Current:     docPara,
+						Rule:        "paragraph_compliance",
+						Suggestions: []string{"Update paragraph format to match template"},
+					}}
+				}
 				break
 			}
 		}
@@ -326,10 +393,45 @@ func (dc *DocumentComparator) compareParagraphRules(docParagraphs, templateParag
 				Description: fmt.Sprintf("Missing required paragraph rule: %s", templatePara.Name),
 				Expected:    templatePara,
 				Current:     nil,
+				Rule:        "paragraph_required",
+				Suggestions: []string{"Add the required paragraph rule to the document"},
 			}}
 		}
 
 		comparisons = append(comparisons, comparison)
+	}
+
+	// 检查文档中额外的段落规则
+	for _, docPara := range docParagraphs {
+		found := false
+		for _, templatePara := range templateParagraphs {
+			if docPara.ID == templatePara.ID {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			comparison := RuleComparison{
+				RuleID:    docPara.ID,
+				RuleName:  docPara.Name,
+				RuleType:  "paragraph",
+				Compliant: false,
+				Score:     0.0,
+				Issues: []FormatIssue{{
+					ID:          fmt.Sprintf("paragraph_extra_%s", docPara.ID),
+					Type:        IssueParagraph,
+					Severity:    SeverityLow,
+					Location:    "document",
+					Description: fmt.Sprintf("Extra paragraph rule found: %s", docPara.Name),
+					Expected:    nil,
+					Current:     docPara,
+					Rule:        "paragraph_extra",
+					Suggestions: []string{"Remove extra paragraph rule or update template"},
+				}},
+			}
+			comparisons = append(comparisons, comparison)
+		}
 	}
 
 	return comparisons
@@ -338,6 +440,7 @@ func (dc *DocumentComparator) compareParagraphRules(docParagraphs, templateParag
 func (dc *DocumentComparator) compareTableRules(docTables, templateTables []types.TableRule) []RuleComparison {
 	var comparisons []RuleComparison
 
+	// 检查模板中的每个表格规则
 	for _, templateTable := range templateTables {
 		comparison := RuleComparison{
 			RuleID:   templateTable.ID,
@@ -353,6 +456,21 @@ func (dc *DocumentComparator) compareTableRules(docTables, templateTables []type
 				comparison.Compliant = dc.isTableCompliant(docTable, templateTable)
 				comparison.Score = dc.calculateTableScore(docTable, templateTable)
 				comparison.Differences = dc.getTableDifferences(docTable, templateTable)
+
+				// 如果不合规，生成问题
+				if !comparison.Compliant {
+					comparison.Issues = []FormatIssue{{
+						ID:          fmt.Sprintf("table_mismatch_%s", templateTable.ID),
+						Type:        IssueTable,
+						Severity:    SeverityMedium,
+						Location:    "document",
+						Description: fmt.Sprintf("Table rule mismatch: %s", templateTable.Name),
+						Expected:    templateTable,
+						Current:     docTable,
+						Rule:        "table_compliance",
+						Suggestions: []string{"Update table format to match template"},
+					}}
+				}
 				break
 			}
 		}
@@ -368,10 +486,45 @@ func (dc *DocumentComparator) compareTableRules(docTables, templateTables []type
 				Description: fmt.Sprintf("Missing required table rule: %s", templateTable.Name),
 				Expected:    templateTable,
 				Current:     nil,
+				Rule:        "table_required",
+				Suggestions: []string{"Add the required table rule to the document"},
 			}}
 		}
 
 		comparisons = append(comparisons, comparison)
+	}
+
+	// 检查文档中额外的表格规则
+	for _, docTable := range docTables {
+		found := false
+		for _, templateTable := range templateTables {
+			if docTable.ID == templateTable.ID {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			comparison := RuleComparison{
+				RuleID:    docTable.ID,
+				RuleName:  docTable.Name,
+				RuleType:  "table",
+				Compliant: false,
+				Score:     0.0,
+				Issues: []FormatIssue{{
+					ID:          fmt.Sprintf("table_extra_%s", docTable.ID),
+					Type:        IssueTable,
+					Severity:    SeverityLow,
+					Location:    "document",
+					Description: fmt.Sprintf("Extra table rule found: %s", docTable.Name),
+					Expected:    nil,
+					Current:     docTable,
+					Rule:        "table_extra",
+					Suggestions: []string{"Remove extra table rule or update template"},
+				}},
+			}
+			comparisons = append(comparisons, comparison)
+		}
 	}
 
 	return comparisons
@@ -380,6 +533,7 @@ func (dc *DocumentComparator) compareTableRules(docTables, templateTables []type
 func (dc *DocumentComparator) comparePageRules(docPages, templatePages []types.PageRule) []RuleComparison {
 	var comparisons []RuleComparison
 
+	// 检查模板中的每个页面规则
 	for _, templatePage := range templatePages {
 		comparison := RuleComparison{
 			RuleID:   templatePage.ID,
@@ -395,6 +549,21 @@ func (dc *DocumentComparator) comparePageRules(docPages, templatePages []types.P
 				comparison.Compliant = dc.isPageCompliant(docPage, templatePage)
 				comparison.Score = dc.calculatePageScore(docPage, templatePage)
 				comparison.Differences = dc.getPageDifferences(docPage, templatePage)
+
+				// 如果不合规，生成问题
+				if !comparison.Compliant {
+					comparison.Issues = []FormatIssue{{
+						ID:          fmt.Sprintf("page_mismatch_%s", templatePage.ID),
+						Type:        IssuePage,
+						Severity:    SeverityMedium,
+						Location:    "document",
+						Description: fmt.Sprintf("Page rule mismatch: %s", templatePage.Name),
+						Expected:    templatePage,
+						Current:     docPage,
+						Rule:        "page_compliance",
+						Suggestions: []string{"Update page format to match template"},
+					}}
+				}
 				break
 			}
 		}
@@ -410,10 +579,45 @@ func (dc *DocumentComparator) comparePageRules(docPages, templatePages []types.P
 				Description: fmt.Sprintf("Missing required page rule: %s", templatePage.Name),
 				Expected:    templatePage,
 				Current:     nil,
+				Rule:        "page_required",
+				Suggestions: []string{"Add the required page rule to the document"},
 			}}
 		}
 
 		comparisons = append(comparisons, comparison)
+	}
+
+	// 检查文档中额外的页面规则
+	for _, docPage := range docPages {
+		found := false
+		for _, templatePage := range templatePages {
+			if docPage.ID == templatePage.ID {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			comparison := RuleComparison{
+				RuleID:    docPage.ID,
+				RuleName:  docPage.Name,
+				RuleType:  "page",
+				Compliant: false,
+				Score:     0.0,
+				Issues: []FormatIssue{{
+					ID:          fmt.Sprintf("page_extra_%s", docPage.ID),
+					Type:        IssuePage,
+					Severity:    SeverityLow,
+					Location:    "document",
+					Description: fmt.Sprintf("Extra page rule found: %s", docPage.Name),
+					Expected:    nil,
+					Current:     docPage,
+					Rule:        "page_extra",
+					Suggestions: []string{"Remove extra page rule or update template"},
+				}},
+			}
+			comparisons = append(comparisons, comparison)
+		}
 	}
 
 	return comparisons

@@ -44,6 +44,8 @@ func NewDocParser() *DocParser {
 
 // ParseDocument 解析.doc文档
 func (dp *DocParser) ParseDocument(filePath string) (*types.Document, error) {
+	fmt.Printf("开始解析DOC文档: %s\n", filePath)
+
 	// 验证文件
 	if err := dp.ValidateFile(filePath); err != nil {
 		return nil, err
@@ -55,36 +57,130 @@ func (dp *DocParser) ParseDocument(filePath string) (*types.Document, error) {
 		return nil, fmt.Errorf("failed to parse header: %w", err)
 	}
 
+	fmt.Printf("文档版本: %s %d.%d.%d\n", header.Version.Platform, header.Version.Major, header.Version.Minor, header.Version.Build)
+
 	doc := &types.Document{}
 
 	// 解析元数据
+	fmt.Println("正在解析文档元数据...")
 	metadata, err := dp.parseMetadata(filePath, header)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse metadata: %w", err)
 	}
 	doc.Metadata = *metadata
+	fmt.Printf("元数据解析完成:\n")
+	fmt.Printf("  - 标题: %s\n", metadata.Title)
+	fmt.Printf("  - 作者: %s\n", metadata.Author)
+	fmt.Printf("  - 创建时间: %s\n", metadata.Created.Format("2006-01-02 15:04:05"))
+	fmt.Printf("  - 修改时间: %s\n", metadata.Modified.Format("2006-01-02 15:04:05"))
+	fmt.Printf("  - 页数: %d\n", metadata.PageCount)
+	fmt.Printf("  - 字数: %d\n", metadata.WordCount)
 
 	// 解析内容
+	fmt.Println("正在解析文档内容...")
 	content, err := dp.parseContent(filePath, header)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse content: %w", err)
 	}
 	doc.Content = *content
+	fmt.Printf("内容解析完成:\n")
+	fmt.Printf("  - 段落数量: %d\n", len(content.Paragraphs))
+	fmt.Printf("  - 表格数量: %d\n", len(content.Tables))
+	fmt.Printf("  - 图片数量: %d\n", len(content.Images))
+	fmt.Printf("  - 页眉数量: %d\n", len(content.Headers))
+	fmt.Printf("  - 页脚数量: %d\n", len(content.Footers))
+	fmt.Printf("  - 节数量: %d\n", len(content.Sections))
 
 	// 解析样式
+	fmt.Println("正在解析文档样式...")
 	styles, err := dp.parseStyles(filePath, header)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse styles: %w", err)
 	}
 	doc.Styles = *styles
+	fmt.Printf("样式解析完成:\n")
+	fmt.Printf("  - 段落样式数量: %d\n", len(styles.ParagraphStyles))
+	fmt.Printf("  - 字符样式数量: %d\n", len(styles.CharacterStyles))
+	fmt.Printf("  - 表格样式数量: %d\n", len(styles.TableStyles))
 
 	// 解析格式规则
+	fmt.Println("正在解析格式规则...")
 	formatRules, err := dp.parseFormatRules(filePath, header)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse format rules: %w", err)
 	}
 	doc.FormatRules = *formatRules
+	fmt.Printf("格式规则解析完成:\n")
+	fmt.Printf("  - 字体规则数量: %d\n", len(formatRules.FontRules))
+	fmt.Printf("  - 段落规则数量: %d\n", len(formatRules.ParagraphRules))
+	fmt.Printf("  - 表格规则数量: %d\n", len(formatRules.TableRules))
+	fmt.Printf("  - 页面规则数量: %d\n", len(formatRules.PageRules))
 
+	// 打印详细的格式信息
+	fmt.Println("\n=== 详细格式信息 ===")
+
+	// 打印字体规则
+	if len(formatRules.FontRules) > 0 {
+		fmt.Println("\n字体规则:")
+		for i, font := range formatRules.FontRules {
+			fmt.Printf("  %d. ID: %s, 名称: %s, 大小: %.1f, 颜色: %s\n",
+				i+1, font.ID, font.Name, font.Size, font.Color.RGB)
+		}
+	}
+
+	// 打印段落规则
+	if len(formatRules.ParagraphRules) > 0 {
+		fmt.Println("\n段落规则:")
+		for i, para := range formatRules.ParagraphRules {
+			fmt.Printf("  %d. ID: %s, 名称: %s, 对齐: %s, 缩进: %.1f\n",
+				i+1, para.ID, para.Name, para.Alignment, para.Indentation.Left)
+		}
+	}
+
+	// 打印表格规则
+	if len(formatRules.TableRules) > 0 {
+		fmt.Println("\n表格规则:")
+		for i, table := range formatRules.TableRules {
+			fmt.Printf("  %d. ID: %s, 名称: %s, 宽度: %.1f, 对齐: %s\n",
+				i+1, table.ID, table.Name, table.Width, table.Alignment)
+		}
+	}
+
+	// 打印页面规则
+	if len(formatRules.PageRules) > 0 {
+		fmt.Println("\n页面规则:")
+		for i, page := range formatRules.PageRules {
+			fmt.Printf("  %d. ID: %s, 名称: %s, 宽度: %.1f, 高度: %.1f\n",
+				i+1, page.ID, page.Name, page.PageSize.Width, page.PageSize.Height)
+		}
+	}
+
+	// 打印样式信息
+	if len(styles.ParagraphStyles) > 0 {
+		fmt.Println("\n段落样式:")
+		for i, style := range styles.ParagraphStyles {
+			fmt.Printf("  %d. ID: %s, 名称: %s\n",
+				i+1, style.ID, style.Name)
+		}
+	}
+
+	if len(styles.CharacterStyles) > 0 {
+		fmt.Println("\n字符样式:")
+		for i, style := range styles.CharacterStyles {
+			fmt.Printf("  %d. ID: %s, 名称: %s\n",
+				i+1, style.ID, style.Name)
+		}
+	}
+
+	if len(styles.TableStyles) > 0 {
+		fmt.Println("\n表格样式:")
+		for i, style := range styles.TableStyles {
+			fmt.Printf("  %d. ID: %s, 名称: %s\n",
+				i+1, style.ID, style.Name)
+		}
+	}
+
+	fmt.Printf("\n文档解析完成: %s\n", filePath)
 	return doc, nil
 }
 
