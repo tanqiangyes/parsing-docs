@@ -63,7 +63,7 @@
     }
   },
   "templates": {
-    "default_directory": "templates",
+    "supported_formats": ["docx", "doc", "dot", "dotx"],
     "auto_load": true,
     "validation": {
       "strict": true,
