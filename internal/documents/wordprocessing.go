@@ -9,6 +9,7 @@ import (
 
 	"docs-parser/internal/core/types"
 	"docs-parser/internal/packaging"
+	"docs-parser/internal/utils"
 )
 
 // WordprocessingDocument 表示Word文档
@@ -16,6 +17,7 @@ type WordprocessingDocument struct {
 	Container *packaging.OPCContainer
 	Document  *types.Document
 	Parts     map[string]*DocumentPart
+	Monitor   *utils.PerformanceMonitor
 }
 
 // DocumentPart 表示文档部分
@@ -31,11 +33,15 @@ func NewWordprocessingDocument(path string) *WordprocessingDocument {
 	return &WordprocessingDocument{
 		Container: packaging.NewOPCContainer(path),
 		Parts:     make(map[string]*DocumentPart),
+		Monitor:   utils.NewPerformanceMonitor(),
 	}
 }
 
 // Open 打开Word文档
 func (wd *WordprocessingDocument) Open() error {
+	openStep := wd.Monitor.StartStep("打开OPC容器")
+	defer openStep()
+
 	// 打开OPC容器
 	if err := wd.Container.Open(); err != nil {
 		return fmt.Errorf("failed to open OPC container: %w", err)
@@ -47,6 +53,9 @@ func (wd *WordprocessingDocument) Open() error {
 	}
 
 	// 加载文档部分
+	loadStep := wd.Monitor.StartStep("加载文档部分")
+	defer loadStep()
+
 	if err := wd.loadParts(); err != nil {
 		return fmt.Errorf("failed to load document parts: %w", err)
 	}
@@ -154,24 +163,32 @@ func (wd *WordprocessingDocument) Parse() (*types.Document, error) {
 	doc := &types.Document{}
 
 	// 解析元数据
+	metadataStep := wd.Monitor.StartStep("解析元数据")
 	if err := wd.parseMetadata(doc); err != nil {
 		return nil, fmt.Errorf("failed to parse metadata: %w", err)
 	}
+	metadataStep()
 
 	// 解析内容
+	contentStep := wd.Monitor.StartStep("解析内容")
 	if err := wd.parseContent(doc); err != nil {
 		return nil, fmt.Errorf("failed to parse content: %w", err)
 	}
+	contentStep()
 
 	// 解析样式
+	styleStep := wd.Monitor.StartStep("解析样式")
 	if err := wd.parseStyles(doc); err != nil {
 		return nil, fmt.Errorf("failed to parse styles: %w", err)
 	}
+	styleStep()
 
 	// 解析格式规则
+	formatStep := wd.Monitor.StartStep("解析格式规则")
 	if err := wd.parseFormatRules(doc); err != nil {
 		return nil, fmt.Errorf("failed to parse format rules: %w", err)
 	}
+	formatStep()
 
 	wd.Document = doc
 	return doc, nil
@@ -299,9 +316,9 @@ func (wd *WordprocessingDocument) parseMainDocument(content []byte, doc *types.D
 	var document struct {
 		XMLName xml.Name `xml:"document"`
 		Body    struct {
-			XMLName     xml.Name `xml:"body"`
-			Paragraphs  []struct {
-				XMLName xml.Name `xml:"p"`
+			XMLName    xml.Name `xml:"body"`
+			Paragraphs []struct {
+				XMLName    xml.Name `xml:"p"`
 				Properties struct {
 					Style struct {
 						Val string `xml:"val,attr"`
@@ -310,9 +327,9 @@ func (wd *WordprocessingDocument) parseMainDocument(content []byte, doc *types.D
 						Val string `xml:"val,attr"`
 					} `xml:"jc"`
 					Indentation struct {
-						Left   string `xml:"left,attr"`
-						Right  string `xml:"right,attr"`
-						First  string `xml:"firstLine,attr"`
+						Left    string `xml:"left,attr"`
+						Right   string `xml:"right,attr"`
+						First   string `xml:"firstLine,attr"`
 						Hanging string `xml:"hanging,attr"`
 					} `xml:"ind"`
 					Spacing struct {
@@ -322,7 +339,7 @@ func (wd *WordprocessingDocument) parseMainDocument(content []byte, doc *types.D
 					} `xml:"spacing"`
 				} `xml:"pPr"`
 				Runs []struct {
-					XMLName xml.Name `xml:"r"`
+					XMLName    xml.Name `xml:"r"`
 					Properties struct {
 						Font struct {
 							Val string `xml:"val,attr"`
@@ -339,6 +356,84 @@ func (wd *WordprocessingDocument) parseMainDocument(content []byte, doc *types.D
 					Text string `xml:"t"`
 				} `xml:"r"`
 			} `xml:"p"`
+			Tables []struct {
+				XMLName    xml.Name `xml:"tbl"`
+				Properties struct {
+					Width struct {
+						Val string `xml:"val,attr"`
+					} `xml:"tblW"`
+					Justification struct {
+						Val string `xml:"val,attr"`
+					} `xml:"jc"`
+					Borders struct {
+						Top struct {
+							Val string `xml:"val,attr"`
+						} `xml:"top"`
+						Bottom struct {
+							Val string `xml:"val,attr"`
+						} `xml:"bottom"`
+						Left struct {
+							Val string `xml:"val,attr"`
+						} `xml:"left"`
+						Right struct {
+							Val string `xml:"val,attr"`
+						} `xml:"right"`
+					} `xml:"tblBorders"`
+				} `xml:"tblPr"`
+				Rows []struct {
+					XMLName    xml.Name `xml:"tr"`
+					Properties struct {
+						Height struct {
+							Val string `xml:"val,attr"`
+						} `xml:"trHeight"`
+					} `xml:"trPr"`
+					Cells []struct {
+						XMLName    xml.Name `xml:"tc"`
+						Properties struct {
+							Width struct {
+								Val string `xml:"val,attr"`
+							} `xml:"tcW"`
+							Borders struct {
+								Top struct {
+									Val string `xml:"val,attr"`
+								} `xml:"top"`
+								Bottom struct {
+									Val string `xml:"val,attr"`
+								} `xml:"bottom"`
+								Left struct {
+									Val string `xml:"val,attr"`
+								} `xml:"left"`
+								Right struct {
+									Val string `xml:"val,attr"`
+								} `xml:"right"`
+							} `xml:"tcBorders"`
+						} `xml:"tcPr"`
+						Paragraphs []struct {
+							Properties struct {
+								Alignment struct {
+									Val string `xml:"val,attr"`
+								} `xml:"jc"`
+							} `xml:"pPr"`
+							Runs []struct {
+								Properties struct {
+									Font struct {
+										Val string `xml:"val,attr"`
+									} `xml:"rFonts"`
+									Size struct {
+										Val string `xml:"val,attr"`
+									} `xml:"sz"`
+									Bold   bool `xml:"b"`
+									Italic bool `xml:"i"`
+									Color  struct {
+										Val string `xml:"val,attr"`
+									} `xml:"color"`
+								} `xml:"rPr"`
+								Text string `xml:"t"`
+							} `xml:"r"`
+						} `xml:"p"`
+					} `xml:"tc"`
+				} `xml:"tr"`
+			} `xml:"tbl"`
 		} `xml:"body"`
 	}
 
@@ -431,16 +526,272 @@ func (wd *WordprocessingDocument) parseMainDocument(content []byte, doc *types.D
 		doc.Content.Paragraphs = append(doc.Content.Paragraphs, paragraph)
 	}
 
+	// 解析表格
+	for i, t := range document.Body.Tables {
+		table := types.Table{
+			ID: fmt.Sprintf("table_%d", i+1),
+		}
+
+		// 解析表格属性
+		if t.Properties.Width.Val != "" {
+			if val, err := strconv.ParseFloat(t.Properties.Width.Val, 64); err == nil {
+				table.Width = val / 20.0
+			}
+		}
+
+		if t.Properties.Justification.Val != "" {
+			table.Alignment = types.Alignment(t.Properties.Justification.Val)
+		}
+
+		// 解析表格边框
+		if t.Properties.Borders.Top.Val != "" {
+			table.Borders.Top.Style = types.BorderStyle(t.Properties.Borders.Top.Val)
+		}
+		if t.Properties.Borders.Bottom.Val != "" {
+			table.Borders.Bottom.Style = types.BorderStyle(t.Properties.Borders.Bottom.Val)
+		}
+		if t.Properties.Borders.Left.Val != "" {
+			table.Borders.Left.Style = types.BorderStyle(t.Properties.Borders.Left.Val)
+		}
+		if t.Properties.Borders.Right.Val != "" {
+			table.Borders.Right.Style = types.BorderStyle(t.Properties.Borders.Right.Val)
+		}
+
+		for j, row := range t.Rows {
+			tableRow := types.TableRow{
+				ID: fmt.Sprintf("row_%d_%d", i+1, j+1),
+			}
+
+			// 解析行高度
+			if row.Properties.Height.Val != "" {
+				if val, err := strconv.ParseFloat(row.Properties.Height.Val, 64); err == nil {
+					tableRow.Height = val / 20.0
+				}
+			}
+
+			for k, cell := range row.Cells {
+				tableCell := types.TableCell{
+					ID: fmt.Sprintf("cell_%d_%d_%d", i+1, j+1, k+1),
+				}
+
+				// 解析单元格宽度
+				if cell.Properties.Width.Val != "" {
+					if val, err := strconv.ParseFloat(cell.Properties.Width.Val, 64); err == nil {
+						tableCell.Width = val / 20.0
+					}
+				}
+
+				// 解析单元格边框
+				if cell.Properties.Borders.Top.Val != "" {
+					tableCell.Borders.Top.Style = types.BorderStyle(cell.Properties.Borders.Top.Val)
+				}
+				if cell.Properties.Borders.Bottom.Val != "" {
+					tableCell.Borders.Bottom.Style = types.BorderStyle(cell.Properties.Borders.Bottom.Val)
+				}
+				if cell.Properties.Borders.Left.Val != "" {
+					tableCell.Borders.Left.Style = types.BorderStyle(cell.Properties.Borders.Left.Val)
+				}
+				if cell.Properties.Borders.Right.Val != "" {
+					tableCell.Borders.Right.Style = types.BorderStyle(cell.Properties.Borders.Right.Val)
+				}
+
+				// 解析单元格内容
+				var cellText strings.Builder
+				for _, para := range cell.Paragraphs {
+					cellParagraph := types.Paragraph{
+						ID: fmt.Sprintf("cell_para_%d_%d_%d", i+1, j+1, k+1),
+					}
+
+					// 解析段落对齐方式
+					if para.Properties.Alignment.Val != "" {
+						cellParagraph.Alignment = types.Alignment(para.Properties.Alignment.Val)
+					}
+
+					// 解析段落文本运行
+					for _, run := range para.Runs {
+						cellRun := types.TextRun{
+							ID:     fmt.Sprintf("cell_run_%d_%d_%d", i+1, j+1, k+1),
+							Text:   run.Text,
+							Bold:   run.Properties.Bold,
+							Italic: run.Properties.Italic,
+						}
+
+						// 解析字体
+						if run.Properties.Font.Val != "" {
+							cellRun.Font.Name = run.Properties.Font.Val
+						}
+
+						// 解析字体大小
+						if run.Properties.Size.Val != "" {
+							if sz, err := strconv.ParseFloat(run.Properties.Size.Val, 64); err == nil {
+								cellRun.Font.Size = sz / 2.0
+								cellRun.Size = sz / 2.0
+							}
+						}
+
+						// 解析颜色
+						if run.Properties.Color.Val != "" {
+							cellRun.Font.Color.RGB = run.Properties.Color.Val
+							cellRun.Color.RGB = run.Properties.Color.Val
+						}
+
+						cellParagraph.Runs = append(cellParagraph.Runs, cellRun)
+						cellText.WriteString(run.Text)
+					}
+
+					cellParagraph.Text = cellText.String()
+					tableCell.Content = append(tableCell.Content, cellParagraph)
+				}
+
+				tableRow.Cells = append(tableRow.Cells, tableCell)
+			}
+
+			table.Rows = append(table.Rows, tableRow)
+		}
+
+		doc.Content.Tables = append(doc.Content.Tables, table)
+	}
+
 	return nil
 }
 
 // parseStyles 解析样式
 func (wd *WordprocessingDocument) parseStyles(doc *types.Document) error {
-	// 简化样式解析，实际应该解析styles.xml
+	// 初始化样式结构
 	doc.Styles = types.DocumentStyles{
 		ParagraphStyles: []types.ParagraphStyle{},
 		CharacterStyles: []types.CharacterStyle{},
 		TableStyles:     []types.TableStyle{},
+	}
+
+	// 尝试解析styles.xml
+	if err := wd.parseStylesXML(doc); err != nil {
+		// 如果styles.xml不存在或解析失败，从内联样式中提取
+		if err := wd.extractInlineStyles(doc); err != nil {
+			return fmt.Errorf("failed to parse styles: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// parseStylesXML 解析styles.xml文件
+func (wd *WordprocessingDocument) parseStylesXML(doc *types.Document) error {
+	part, exists := wd.Parts["styles.xml"]
+	if !exists {
+		return fmt.Errorf("styles.xml not found")
+	}
+
+	var stylesDoc struct {
+		XMLName xml.Name `xml:"styles"`
+		Styles  []struct {
+			XMLName xml.Name `xml:"style"`
+			ID      string   `xml:"styleId,attr"`
+			Name    string   `xml:"name,attr"`
+			Type    string   `xml:"type,attr"`
+			BasedOn struct {
+				Val string `xml:"val,attr"`
+			} `xml:"basedOn"`
+			Next struct {
+				Val string `xml:"val,attr"`
+			} `xml:"next"`
+			Linked struct {
+				Val string `xml:"val,attr"`
+			} `xml:"link"`
+			Properties struct {
+				Font struct {
+					Name string `xml:"name,attr"`
+					Size string `xml:"size,attr"`
+				} `xml:"rFonts"`
+				Paragraph struct {
+					Alignment struct {
+						Val string `xml:"val,attr"`
+					} `xml:"jc"`
+					Indentation struct {
+						Left    string `xml:"left,attr"`
+						Right   string `xml:"right,attr"`
+						First   string `xml:"firstLine,attr"`
+						Hanging string `xml:"hanging,attr"`
+					} `xml:"ind"`
+					Spacing struct {
+						Before string `xml:"before,attr"`
+						After  string `xml:"after,attr"`
+						Line   string `xml:"line,attr"`
+					} `xml:"spacing"`
+				} `xml:"pPr"`
+			} `xml:"rPr"`
+		} `xml:"style"`
+	}
+
+	if err := xml.Unmarshal(part.Content, &stylesDoc); err != nil {
+		return fmt.Errorf("failed to unmarshal styles.xml: %w", err)
+	}
+
+	// 解析样式
+	for _, style := range stylesDoc.Styles {
+		switch style.Type {
+		case "paragraph":
+			paraStyle := types.ParagraphStyle{
+				ID:   style.ID,
+				Name: style.Name,
+			}
+			doc.Styles.ParagraphStyles = append(doc.Styles.ParagraphStyles, paraStyle)
+
+		case "character":
+			charStyle := types.CharacterStyle{
+				ID:   style.ID,
+				Name: style.Name,
+			}
+			doc.Styles.CharacterStyles = append(doc.Styles.CharacterStyles, charStyle)
+
+		case "table":
+			tableStyle := types.TableStyle{
+				ID:   style.ID,
+				Name: style.Name,
+			}
+			doc.Styles.TableStyles = append(doc.Styles.TableStyles, tableStyle)
+		}
+	}
+
+	return nil
+}
+
+// extractInlineStyles 从内联样式中提取样式信息
+func (wd *WordprocessingDocument) extractInlineStyles(doc *types.Document) error {
+	// 从文档内容中提取使用的样式
+	usedStyles := make(map[string]bool)
+
+	// 从段落中提取样式
+	for _, para := range doc.Content.Paragraphs {
+		if para.Style.Name != "" {
+			usedStyles[para.Style.Name] = true
+		}
+	}
+
+	// 从文本运行中提取样式
+	for _, para := range doc.Content.Paragraphs {
+		for _, run := range para.Runs {
+			if run.Font.Name != "" {
+				usedStyles[run.Font.Name] = true
+			}
+		}
+	}
+
+	// 创建样式对象
+	for styleName := range usedStyles {
+		// 创建段落样式
+		paraStyle := types.ParagraphStyle{
+			ID:   styleName,
+			Name: styleName,
+		}
+		doc.Styles.ParagraphStyles = append(doc.Styles.ParagraphStyles, paraStyle)
+
+		// 创建字符样式
+		charStyle := types.CharacterStyle{
+			ID:   styleName,
+			Name: styleName,
+		}
+		doc.Styles.CharacterStyles = append(doc.Styles.CharacterStyles, charStyle)
 	}
 
 	return nil
@@ -466,6 +817,67 @@ func (wd *WordprocessingDocument) parseFormatRules(doc *types.Document) error {
 
 // extractFontRules 提取字体规则
 func (wd *WordprocessingDocument) extractFontRules(doc *types.Document) error {
+	// 首先尝试从fontTable.xml获取字体信息
+	fontMap := make(map[string]*types.FontRule)
+
+	// 尝试解析fontTable.xml
+	if err := wd.parseFontTable(fontMap); err != nil {
+		// 如果fontTable.xml不存在，从内联样式中提取
+		if err := wd.extractInlineFonts(doc, fontMap); err != nil {
+			return fmt.Errorf("failed to extract font rules: %w", err)
+		}
+	}
+
+	// 将字体规则添加到文档中
+	for _, fontRule := range fontMap {
+		doc.FormatRules.FontRules = append(doc.FormatRules.FontRules, *fontRule)
+	}
+
+	return nil
+}
+
+// parseFontTable 解析fontTable.xml
+func (wd *WordprocessingDocument) parseFontTable(fontMap map[string]*types.FontRule) error {
+	part, exists := wd.Parts["fontTable.xml"]
+	if !exists {
+		return fmt.Errorf("fontTable.xml not found")
+	}
+
+	var fontTable struct {
+		XMLName xml.Name `xml:"fontTable"`
+		Fonts   []struct {
+			XMLName xml.Name `xml:"font"`
+			Name    string   `xml:"name,attr"`
+			Family  struct {
+				Val string `xml:"val,attr"`
+			} `xml:"family"`
+			Pitch struct {
+				Val string `xml:"val,attr"`
+			} `xml:"pitch"`
+		} `xml:"font"`
+	}
+
+	if err := xml.Unmarshal(part.Content, &fontTable); err != nil {
+		return fmt.Errorf("failed to unmarshal fontTable.xml: %w", err)
+	}
+
+	// 创建字体映射
+	for _, font := range fontTable.Fonts {
+		fontRule := &types.FontRule{
+			ID:    font.Name,
+			Name:  font.Name,
+			Size:  12.0,                       // 默认大小
+			Color: types.Color{RGB: "000000"}, // 默认黑色
+		}
+		fontMap[font.Name] = fontRule
+	}
+
+	return nil
+}
+
+// extractInlineFonts 从内联样式中提取字体信息
+func (wd *WordprocessingDocument) extractInlineFonts(doc *types.Document, fontMap map[string]*types.FontRule) error {
+	// 从文档内容中提取使用的字体
 	usedFonts := make(map[string]*types.FontRule)
 
 	for _, para := range doc.Content.Paragraphs {
@@ -481,13 +893,25 @@ func (wd *WordprocessingDocument) extractFontRules(doc *types.Document) error {
 						Italic: run.Italic,
 					}
 					usedFonts[run.Font.Name] = fontRule
+				} else {
+					// 更新现有字体规则，合并属性
+					existing := usedFonts[run.Font.Name]
+					if run.Font.Size > 0 {
+						existing.Size = run.Font.Size
+					}
+					if run.Font.Color.RGB != "" {
+						existing.Color = run.Font.Color
+					}
+					existing.Bold = existing.Bold || run.Bold
+					existing.Italic = existing.Italic || run.Italic
 				}
 			}
 		}
 	}
 
-	for _, fontRule := range usedFonts {
-		doc.FormatRules.FontRules = append(doc.FormatRules.FontRules, *fontRule)
+	// 将提取的字体规则复制到fontMap
+	for name, rule := range usedFonts {
+		fontMap[name] = rule
 	}
 
 	return nil
@@ -541,4 +965,4 @@ func (wd *WordprocessingDocument) Close() error {
 		return wd.Container.Close()
 	}
 	return nil
-} 
+}

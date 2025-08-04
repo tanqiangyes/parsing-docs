@@ -4,40 +4,17 @@ import (
 	"fmt"
 	"os"
 
-	// "path/filepath"
-	// "docs-parser/internal/core/annotator"
-	"docs-parser/internal/templates"
+	"docs-parser/internal/utils"
 	pkgcomparator "docs-parser/pkg/comparator"
-	pkgparser "docs-parser/pkg/parser"
 
 	"github.com/spf13/cobra"
 )
 
 var rootCmd = &cobra.Command{
 	Use:   "docs-parser",
-	Short: "精确解析Word文档格式并提供修改建议",
-	Long: `文档解析库 - 一个用于精确解析Word文档格式的工具
-支持解析.docx、.doc、.rtf等格式，并提供详细的格式对比和修改建议。`,
-}
-
-var parseCmd = &cobra.Command{
-	Use:   "parse [文件路径]",
-	Short: "解析Word文档",
-	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		filePath := args[0]
-		fmt.Printf("正在解析文件: %s\n", filePath)
-
-		// 使用解析包
-		docParser := pkgparser.NewParser()
-		doc, err := docParser.ParseDocument(filePath)
-		if err != nil {
-			fmt.Printf("解析失败: %v\n", err)
-			os.Exit(1)
-		}
-
-		fmt.Printf("解析成功，文档包含 %d 个段落\n", len(doc.Content.Paragraphs))
-	},
+	Short: "Word文档格式解析与比较工具",
+	Long: `基于Open XML SDK设计原则的Go语言文档解析库，
+支持Word文档格式解析、比较和标注功能。`,
 }
 
 var compareCmd = &cobra.Command{
@@ -69,114 +46,98 @@ var compareCmd = &cobra.Command{
 		// 如果有格式问题，显示问题详情
 		fmt.Printf("发现 %d 个格式问题\n", len(report.Issues))
 
-		// 暂时注释掉标注文档生成，专注于比较功能
-		/*
-			// 如果有格式问题，自动生成标注文档
-			fmt.Printf("发现 %d 个格式问题，正在生成标注文档...\n", len(report.Issues))
-
-			// 生成输出文件路径
-			ext := filepath.Ext(docPath)
-			baseName := docPath[:len(docPath)-len(ext)]
-			outputPath := baseName + "_annotated" + ext
-			fmt.Printf("输出文件路径: %s\n", outputPath)
-
-			// 使用标注包生成标注文档
-			fmt.Println("创建标注器...")
-			docAnnotator := annotator.NewAnnotator()
-			fmt.Println("开始标注文档...")
-			err = docAnnotator.AnnotateDocument(docPath, outputPath)
-			if err != nil {
-				fmt.Printf("生成标注文档失败: %v\n", err)
-				os.Exit(1)
-			}
-
-			fmt.Printf("标注文档已生成: %s\n", outputPath)
-		*/
-
 		fmt.Printf("对比完成，发现 %d 个格式问题\n", len(report.Issues))
 	},
 }
 
-var templateCmd = &cobra.Command{
-	Use:   "template [模板路径]",
-	Short: "显示Word文档模板信息",
-	Long: `解析并显示Word文档模板的详细信息，包括格式规则、样式等。
-支持.docx、.doc、.dot、.dotx格式的模板文件。`,
-	Args: cobra.ExactArgs(1),
+var validateCmd = &cobra.Command{
+	Use:   "validate [文档路径]",
+	Short: "验证文档格式",
+	Long:  `验证Word文档的格式是否符合标准。`,
+	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		templatePath := args[0]
+		docPath := args[0]
+		fmt.Printf("正在验证文档: %s\n", docPath)
+		fmt.Println("验证功能正在开发中...")
+	},
+}
 
-		fmt.Printf("正在解析Word文档模板: %s\n", templatePath)
+var annotateCmd = &cobra.Command{
+	Use:   "annotate [文档路径]",
+	Short: "标注文档",
+	Long:  `为Word文档添加格式标注。`,
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		docPath := args[0]
+		fmt.Printf("正在标注文档: %s\n", docPath)
+		fmt.Println("标注功能正在开发中...")
+	},
+}
 
-		// 使用模板管理器
-		templateManager := templates.NewTemplateManager("")
-		template, err := templateManager.LoadTemplate(templatePath)
+var configCmd = &cobra.Command{
+	Use:   "config",
+	Short: "配置管理",
+	Long:  `管理docs-parser的配置选项。`,
+}
+
+var configShowCmd = &cobra.Command{
+	Use:   "show",
+	Short: "显示当前配置",
+	Run: func(cmd *cobra.Command, args []string) {
+		configPath := utils.GetConfigPath()
+		config, err := utils.LoadConfig(configPath)
 		if err != nil {
-			fmt.Printf("解析模板失败: %v\n", err)
+			fmt.Printf("加载配置失败: %v\n", err)
 			os.Exit(1)
 		}
 
-		// 显示模板信息
-		fmt.Printf("\n模板信息:\n")
-		fmt.Printf("  ID: %s\n", template.ID)
-		fmt.Printf("  名称: %s\n", template.Name)
-		fmt.Printf("  描述: %s\n", template.Description)
-		fmt.Printf("  版本: %s\n", template.Version)
-		fmt.Printf("  源文件: %s\n", template.SourcePath)
+		fmt.Println("当前配置:")
+		fmt.Printf("  性能监控: %v\n", config.ParseOptions.EnablePerformanceMonitoring)
+		fmt.Printf("  详细输出: %v\n", config.ParseOptions.EnableDetailedOutput)
+		fmt.Printf("  样式解析: %v\n", config.ParseOptions.EnableStyleParsing)
+		fmt.Printf("  表格解析: %v\n", config.ParseOptions.EnableTableParsing)
+		fmt.Printf("  严格模式: %v\n", config.CompareOptions.StrictMode)
+		fmt.Printf("  忽略大小写: %v\n", config.CompareOptions.IgnoreCase)
+		fmt.Printf("  缓存启用: %v\n", config.PerformanceOptions.EnableCaching)
+		fmt.Printf("  缓存大小: %d\n", config.PerformanceOptions.CacheSize)
+	},
+}
 
-		fmt.Printf("  元数据:\n")
-		fmt.Printf("    作者: %s\n", template.Metadata.Author)
-		fmt.Printf("    创建时间: %s\n", template.Metadata.Created)
-		fmt.Printf("    最后更新: %s\n", template.Metadata.LastUpdated)
-		fmt.Printf("    分类: %s\n", template.Metadata.Category)
-		fmt.Printf("    标签: %v\n", template.Metadata.Tags)
+var configResetCmd = &cobra.Command{
+	Use:   "reset",
+	Short: "重置为默认配置",
+	Run: func(cmd *cobra.Command, args []string) {
+		configPath := utils.GetConfigPath()
+		config := utils.DefaultConfig()
 
-		fmt.Printf("  格式规则:\n")
-		fmt.Printf("    字体规则数量: %d\n", len(template.FormatRules.FontRules))
-		fmt.Printf("    段落规则数量: %d\n", len(template.FormatRules.ParagraphRules))
-		fmt.Printf("    表格规则数量: %d\n", len(template.FormatRules.TableRules))
-		fmt.Printf("    页面规则数量: %d\n", len(template.FormatRules.PageRules))
-
-		// 显示字体规则
-		if len(template.FormatRules.FontRules) > 0 {
-			fmt.Printf("    字体规则:\n")
-			for i, rule := range template.FormatRules.FontRules {
-				fmt.Printf("      %d. %s (%.1fpt, %s)\n", i+1, rule.Name, rule.Size, rule.Color.RGB)
-			}
+		if err := utils.SaveConfig(configPath, config); err != nil {
+			fmt.Printf("保存配置失败: %v\n", err)
+			os.Exit(1)
 		}
 
-		// 显示段落规则
-		if len(template.FormatRules.ParagraphRules) > 0 {
-			fmt.Printf("    段落规则:\n")
-			for i, rule := range template.FormatRules.ParagraphRules {
-				fmt.Printf("      %d. %s (对齐: %s)\n", i+1, rule.Name, rule.Alignment)
-			}
-		}
+		fmt.Println("配置已重置为默认值")
+	},
+}
 
-		// 显示表格规则
-		if len(template.FormatRules.TableRules) > 0 {
-			fmt.Printf("    表格规则:\n")
-			for i, rule := range template.FormatRules.TableRules {
-				fmt.Printf("      %d. %s (宽度: %.1f%%)\n", i+1, rule.Name, rule.Width)
-			}
-		}
-
-		// 显示页面规则
-		if len(template.FormatRules.PageRules) > 0 {
-			fmt.Printf("    页面规则:\n")
-			for i, rule := range template.FormatRules.PageRules {
-				fmt.Printf("      %d. %s (%.1fx%.1f)\n", i+1, rule.Name, rule.PageSize.Width, rule.PageSize.Height)
-			}
-		}
-
-		fmt.Println("\n模板解析完成")
+var configPathCmd = &cobra.Command{
+	Use:   "path",
+	Short: "显示配置文件路径",
+	Run: func(cmd *cobra.Command, args []string) {
+		configPath := utils.GetConfigPath()
+		fmt.Printf("配置文件路径: %s\n", configPath)
 	},
 }
 
 func init() {
-	rootCmd.AddCommand(parseCmd)
 	rootCmd.AddCommand(compareCmd)
-	rootCmd.AddCommand(templateCmd)
+	rootCmd.AddCommand(validateCmd)
+	rootCmd.AddCommand(annotateCmd)
+
+	// 配置命令
+	configCmd.AddCommand(configShowCmd)
+	configCmd.AddCommand(configResetCmd)
+	configCmd.AddCommand(configPathCmd)
+	rootCmd.AddCommand(configCmd)
 }
 
 func main() {

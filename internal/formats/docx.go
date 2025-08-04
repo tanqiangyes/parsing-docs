@@ -42,12 +42,41 @@ func (dp *DocxParser) ParseDocument(filePath string) (*types.Document, error) {
 		return nil, fmt.Errorf("failed to parse word document: %w", err)
 	}
 
-	// 打印解析结果
+	// 打印详细的解析结果
 	fmt.Printf("文档解析完成: %s\n", filePath)
 	fmt.Printf("  - 段落数量: %d\n", len(doc.Content.Paragraphs))
+	fmt.Printf("  - 表格数量: %d\n", len(doc.Content.Tables))
 	fmt.Printf("  - 字体规则数量: %d\n", len(doc.FormatRules.FontRules))
 	fmt.Printf("  - 段落规则数量: %d\n", len(doc.FormatRules.ParagraphRules))
+	fmt.Printf("  - 表格规则数量: %d\n", len(doc.FormatRules.TableRules))
 	fmt.Printf("  - 页面规则数量: %d\n", len(doc.FormatRules.PageRules))
+	fmt.Printf("  - 段落样式数量: %d\n", len(doc.Styles.ParagraphStyles))
+	fmt.Printf("  - 字符样式数量: %d\n", len(doc.Styles.CharacterStyles))
+	fmt.Printf("  - 表格样式数量: %d\n", len(doc.Styles.TableStyles))
+
+	// 打印文档元数据
+	fmt.Printf("  - 标题: %s\n", doc.Metadata.Title)
+	fmt.Printf("  - 作者: %s\n", doc.Metadata.Author)
+	fmt.Printf("  - 页数: %d\n", doc.Metadata.PageCount)
+	fmt.Printf("  - 字数: %d\n", doc.Metadata.WordCount)
+
+	// 打印前几个段落的内容摘要
+	if len(doc.Content.Paragraphs) > 0 {
+		fmt.Printf("  - 段落内容摘要:\n")
+		for i, para := range doc.Content.Paragraphs {
+			if i >= 3 { // 只显示前3个段落
+				break
+			}
+			text := para.Text
+			if len(text) > 50 {
+				text = text[:50] + "..."
+			}
+			fmt.Printf("    %d. [%s] %s\n", i+1, para.Style.Name, text)
+		}
+	}
+
+	// 打印性能监控报告
+	wordDoc.Monitor.PrintReport()
 
 	return doc, nil
 }

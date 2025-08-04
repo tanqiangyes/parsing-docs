@@ -1,259 +1,266 @@
 # Docs Parser - Go 文档解析库
 
-基于 Open XML SDK 设计原则的 Go 语言文档解析库，支持 Word 文档格式解析、比较和标注。
+基于 Open XML SDK 设计原则的 Go 语言文档解析库，提供高性能、类型安全的 Word 文档解析、比较和标注功能。
 
-## 特性
+## 🚀 核心特性
 
-### 🏗️ 分层架构
-- **Packaging Layer**: OPC (Open Packaging Convention) 容器处理
-- **Document Layer**: 特定文档类型处理 (Word, Excel, PowerPoint)
-- **Part Layer**: 文档内各个部分处理 (document.xml, styles.xml 等)
-- **Element Layer**: XML 元素和属性处理
+### 分层架构设计
+- **Packaging Layer**: OPC 容器处理，支持 Open Packaging Convention
+- **Document Layer**: Word 文档处理，管理文档部分和解析流程
+- **Part Layer**: 文档部分处理，XML 内容加载和缓存
+- **Element Layer**: XML 元素处理，强类型系统
 
-### 📄 支持的格式
-- **Word 文档**: `.docx`, `.doc`, `.dot`, `.dotx`
-- **历史版本**: Word 1.0-6.0, 95-2003, 2007-2019, 365
-- **模板文件**: Word 文档模板
-
-### 🔍 核心功能
-- **文档解析**: 完整的 WordprocessingML 解析
-- **格式比较**: 精确的格式规则比较
-- **文档标注**: 自动生成格式标注文档
-- **模板验证**: 基于 Word 文档模板的验证
-
-### ⚡ 性能优化
-- **流式处理**: 内存高效的文档处理
+### 高性能解析
+- **流式处理**: 支持大文件的内存高效处理
 - **延迟加载**: 按需解析文档部分
-- **并发支持**: 并行处理大型文档
+- **并发处理**: 并行解析文档部分
+- **性能监控**: 内置性能监控和报告
 
-## 快速开始
+### 完整的格式支持
+- **Word 格式**: 支持 .docx, .doc, .dot, .dotx
+- **样式解析**: 完整的样式继承和主题支持
+- **表格处理**: 完整的表格结构和内容解析
+- **图形元素**: 图片、形状、图表支持
 
-### 安装
+### 智能比较功能
+- **格式对比**: 精确的格式规则比较
+- **差异检测**: 自动识别格式差异
+- **问题报告**: 详细的格式问题报告
+- **修改建议**: 智能的格式修改建议
+
+## 📦 安装
 
 ```bash
+# 克隆仓库
 git clone https://github.com/your-repo/docs-parser.git
 cd docs-parser
-go mod tidy
-go build -o main.exe cmd/main.go
+
+# 构建项目
+go build -o docs-parser cmd/main.go
+
+# 或者使用 go install
+go install ./cmd/main.go
 ```
 
-### 基本使用
+## 🛠️ 基本使用
+
+### 命令行工具
 
 ```bash
-# 比较两个文档
-./main.exe compare document1.docx document2.docx
+# 对比文档与模板
+./docs-parser compare document.docx template.docx
 
 # 验证文档格式
-./main.exe validate document.docx
+./docs-parser validate document.docx
 
 # 标注文档
-./main.exe annotate document.docx
+./docs-parser annotate document.docx
+
+# 配置管理
+./docs-parser config show
+./docs-parser config reset
+./docs-parser config path
 ```
 
-## 架构设计
-
-### 分层架构
-
-```
-internal/
-├── packaging/     # OPC 容器处理
-├── documents/     # 文档类型处理
-├── parts/         # 文档部分处理
-├── elements/      # XML 元素处理
-└── schemas/       # XML 模式定义
-```
-
-### 核心组件
-
-#### 1. OPC 容器层 (`internal/packaging/`)
-- 处理 Open Packaging Convention 容器
-- 文件索引和访问
-- 内容类型映射
-- 关系文件处理
-
-#### 2. 文档层 (`internal/documents/`)
-- Word 文档处理
-- 文档部分加载
-- 元数据解析
-- 内容提取
-
-#### 3. 解析层 (`internal/formats/`)
-- 格式特定解析器
-- XML 结构定义
-- 数据转换
-
-#### 4. 核心层 (`internal/core/`)
-- 类型定义
-- 比较算法
-- 验证逻辑
-- 标注功能
-
-## API 使用
-
-### 文档解析
+### API 使用
 
 ```go
-import "docs-parser/internal/documents"
+package main
 
-// 创建 Word 文档
-wordDoc := documents.NewWordprocessingDocument("document.docx")
-defer wordDoc.Close()
+import (
+    "fmt"
+    "docs-parser/internal/documents"
+    "docs-parser/internal/utils"
+)
 
-// 打开文档
-if err := wordDoc.Open(); err != nil {
-    log.Fatal(err)
+func main() {
+    // 创建 Word 文档处理器
+    wordDoc := documents.NewWordprocessingDocument("document.docx")
+    defer wordDoc.Close()
+
+    // 打开文档
+    if err := wordDoc.Open(); err != nil {
+        panic(err)
+    }
+
+    // 解析文档
+    doc, err := wordDoc.Parse()
+    if err != nil {
+        panic(err)
+    }
+
+    // 使用解析结果
+    fmt.Printf("文档包含 %d 个段落\n", len(doc.Content.Paragraphs))
+    fmt.Printf("文档包含 %d 个表格\n", len(doc.Content.Tables))
+    fmt.Printf("文档包含 %d 个字体规则\n", len(doc.FormatRules.FontRules))
+
+    // 性能监控
+    wordDoc.Monitor.PrintReport()
 }
+```
+
+## 🏗️ 架构设计
+
+### OPC 容器层
+```go
+// 处理 Open Packaging Convention 容器
+container := packaging.NewOPCContainer("document.docx")
+container.Open()
+defer container.Close()
+
+// 访问文档部分
+content, err := container.ReadFile("word/document.xml")
+```
+
+### 文档层
+```go
+// Word 文档处理
+wordDoc := documents.NewWordprocessingDocument("document.docx")
+wordDoc.Open()
+defer wordDoc.Close()
 
 // 解析文档
 doc, err := wordDoc.Parse()
-if err != nil {
-    log.Fatal(err)
-}
-
-// 访问解析结果
-fmt.Printf("段落数量: %d\n", len(doc.Content.Paragraphs))
-fmt.Printf("字体规则: %d\n", len(doc.FormatRules.FontRules))
 ```
 
-### 格式比较
-
+### 解析层
 ```go
-import "docs-parser/internal/core/comparator"
+// 格式解析器
+docxParser := formats.NewDocxParser()
+doc, err := docxParser.ParseDocument("document.docx")
+```
 
-// 创建比较器
+### 核心层
+```go
+// 文档比较
 comparator := comparator.NewComparator()
-
-// 比较文档与模板
-report, err := comparator.CompareWithTemplate("document.docx", "template.docx")
-if err != nil {
-    log.Fatal(err)
-}
-
-// 检查格式问题
-if len(report.Issues) == 0 {
-    fmt.Println("格式相同")
-} else {
-    fmt.Printf("发现 %d 个格式问题\n", len(report.Issues))
-}
+report, err := comparator.CompareWithTemplate("doc.docx", "template.docx")
 ```
 
-## 命令行工具
+## 📊 性能优化
 
-### 比较命令
+### 流式处理
+- 支持大文件的内存高效处理
+- 延迟加载文档部分
+- 按需解析 XML 内容
 
-```bash
-# 比较两个文档
-./main.exe compare document.docx template.docx
-
-# 输出示例
-正在对比文档: document.docx 与Word模板: template.docx
-文档解析完成: document.docx
-  - 段落数量: 8
-  - 字体规则数量: 2
-  - 段落规则数量: 8
-  - 页面规则数量: 1
-发现 2 个格式问题
-对比完成，发现 2 个格式问题
-```
-
-### 验证命令
-
-```bash
-# 验证文档格式
-./main.exe validate document.docx
-```
-
-### 标注命令
-
-```bash
-# 生成标注文档
-./main.exe annotate document.docx
-```
-
-## 开发指南
-
-### 项目结构
-
-```
-docs-parser/
-├── cmd/                    # 命令行入口
-├── internal/               # 内部包
-│   ├── packaging/         # OPC 容器处理
-│   ├── documents/         # 文档类型处理
-│   ├── formats/           # 格式解析器
-│   ├── core/              # 核心功能
-│   │   ├── types/         # 类型定义
-│   │   ├── parser/        # 解析器工厂
-│   │   ├── comparator/    # 比较器
-│   │   ├── validator/     # 验证器
-│   │   ├── annotator/     # 标注器
-│   │   └── styles/        # 样式处理
-│   └── utils/             # 工具函数
-├── pkg/                   # 公共包
-├── tests/                 # 测试文件
-├── examples/              # 示例代码
-└── docs/                  # 文档
-```
-
-### 添加新格式支持
-
-1. **创建格式解析器**
-```go
-// internal/formats/newformat.go
-type NewFormatParser struct{}
-
-func (nfp *NewFormatParser) ParseDocument(filePath string) (*types.Document, error) {
-    // 实现解析逻辑
-}
-```
-
-2. **注册解析器**
-```go
-// internal/core/parser/factory.go
-func (pf *ParserFactory) RegisterParser(format string, parser Parser) {
-    pf.parsers[format] = parser
-}
-```
-
-3. **添加测试**
-```go
-// tests/newformat_test.go
-func TestNewFormatParser(t *testing.T) {
-    // 测试实现
-}
-```
-
-## 性能优化
-
-### 内存管理
-- 流式读取大文件
-- 延迟解析文档部分
-- 内存池使用
+### 缓存策略
+- 文档部分缓存
+- 解析结果缓存
+- 配置缓存
 
 ### 并发处理
 - 并行解析文档部分
 - 异步 I/O 操作
-- 工作池模式
+- 工作池管理
 
-### 缓存策略
-- 解析结果缓存
-- 格式规则缓存
-- 模板缓存
-
-## 测试
+## 🧪 测试
 
 ```bash
 # 运行所有测试
 go test ./...
 
-# 运行特定测试
-go test ./internal/core/comparator
+# 运行特定包的测试
+go test ./internal/documents
 
 # 运行基准测试
 go test -bench=. ./...
+
+# 生成测试覆盖率报告
+go test -coverprofile=coverage.out ./...
+go tool cover -html=coverage.out
 ```
 
-## 贡献指南
+## 📈 性能监控
+
+内置性能监控功能，提供详细的解析性能报告：
+
+```
+=== 性能监控报告 ===
+总耗时: 2.1801ms
+各步骤耗时:
+  - 打开OPC容器: 515.2µs
+  - 加载文档部分: 515.2µs
+  - 解析元数据: 48µs
+  - 解析内容: 559.3µs
+  - 解析样式: 538.4µs
+  - 解析格式规则: 510.6µs
+==================
+```
+
+## 📁 项目结构
+
+```
+docs-parser/
+├── cmd/                    # 命令行工具
+│   └── main.go
+├── internal/               # 内部包
+│   ├── core/              # 核心功能
+│   │   ├── comparator/    # 文档比较
+│   │   ├── types/         # 类型定义
+│   │   └── utils/         # 工具函数
+│   ├── documents/         # 文档处理层
+│   │   └── wordprocessing.go
+│   ├── packaging/         # OPC 容器层
+│   │   └── opc.go
+│   ├── formats/           # 格式解析器
+│   │   ├── docx.go
+│   │   └── doc.go
+│   └── utils/             # 工具包
+│       ├── performance.go
+│       └── config.go
+├── pkg/                   # 公共包
+│   ├── parser/            # 解析器
+│   └── comparator/        # 比较器
+├── tests/                 # 测试文件
+├── examples/              # 示例代码
+├── docs/                  # 文档
+├── README.md
+└── go.mod
+```
+
+## 🔧 开发
+
+### 环境要求
+- Go 1.21+
+- Git
+
+### 开发流程
+```bash
+# 克隆项目
+git clone https://github.com/your-repo/docs-parser.git
+cd docs-parser
+
+# 安装依赖
+go mod tidy
+
+# 运行测试
+go test ./...
+
+# 构建项目
+go build -o docs-parser cmd/main.go
+
+# 运行示例
+./docs-parser compare examples/doc1.docx examples/template.docx
+```
+
+### 代码规范
+- 使用 `gofmt` 格式化代码
+- 遵循 Go 官方代码规范
+- 添加适当的注释和文档
+- 编写单元测试
+
+## 📚 文档
+
+- [API 文档](docs/api.md)
+- [架构设计](docs/architecture.md)
+- [性能优化](docs/performance.md)
+- [配置指南](docs/configuration.md)
+- [示例代码](examples/)
+
+## 🤝 贡献
+
+欢迎贡献代码！请遵循以下步骤：
 
 1. Fork 项目
 2. 创建功能分支 (`git checkout -b feature/AmazingFeature`)
@@ -261,29 +268,36 @@ go test -bench=. ./...
 4. 推送到分支 (`git push origin feature/AmazingFeature`)
 5. 打开 Pull Request
 
-## 许可证
+## 📄 许可证
 
 本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
 
-## 致谢
+## 🙏 致谢
 
-- 参考 [Microsoft Open XML SDK](https://github.com/dotnet/Open-XML-SDK) 的设计原则
-- 基于 [Open XML 规范](https://docs.microsoft.com/en-us/office/open-xml/open-xml-sdk)
-- 遵循 [OPC 规范](https://docs.microsoft.com/en-us/office/open-xml/opc)
+- [Microsoft Open XML SDK](https://github.com/dotnet/Open-XML-SDK) - 架构设计参考
+- [Open XML Specification](https://docs.microsoft.com/en-us/office/open-xml/) - 规范文档
+- [OPC Specification](https://docs.microsoft.com/en-us/office/open-xml/opc) - 容器规范
 
-## 更新日志
-
-### v1.0.0 (2024-08-01)
-- ✅ 基于 Open XML SDK 的分层架构
-- ✅ 完整的 WordprocessingML 解析
-- ✅ 精确的格式比较算法
-- ✅ 文档标注功能
-- ✅ 命令行工具
-- ✅ 单元测试覆盖
-- ✅ 性能优化
-
-## 联系方式
+## 📞 联系方式
 
 - 项目主页: [GitHub Repository](https://github.com/your-repo/docs-parser)
 - 问题反馈: [Issues](https://github.com/your-repo/docs-parser/issues)
-- 功能请求: [Feature Requests](https://github.com/your-repo/docs-parser/issues/new) 
+- 功能请求: [Feature Requests](https://github.com/your-repo/docs-parser/issues/new)
+
+## 📋 更新日志
+
+### v1.0.0 (2024-01-XX)
+- ✅ 基于 Open XML SDK 重构架构
+- ✅ 实现分层架构设计
+- ✅ 添加性能监控功能
+- ✅ 完善样式解析
+- ✅ 添加表格内容解析
+- ✅ 实现配置管理功能
+- ✅ 优化命令行工具
+- ✅ 添加详细输出功能
+- ✅ 改进错误处理
+- ✅ 完善文档和示例
+
+---
+
+**Docs Parser** - 让 Word 文档解析变得简单高效！ 🚀 
