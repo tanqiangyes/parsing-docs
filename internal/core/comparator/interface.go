@@ -14,7 +14,7 @@ type Comparator interface {
 	CompareDocuments(doc1Path, doc2Path string) (*ComparisonReport, error)
 	
 	// CompareFormatRules 对比格式规则
-	CompareFormatRules(docRules, templateRules *types.FormatRules) (*FormatComparison, error)
+	CompareFormatRules(docRules, templateRules *types.FormatRules, doc, template *types.Document) (*FormatComparison, error)
 	
 	// CompareContent 对比内容
 	CompareContent(docContent, templateContent *types.DocumentContent) (*ContentComparison, error)
@@ -25,30 +25,20 @@ type Comparator interface {
 
 // ComparisonReport 对比报告
 type ComparisonReport struct {
-	DocumentPath    string                `json:"document_path"`
-	TemplatePath    string                `json:"template_path"`
-	OverallScore    float64               `json:"overall_score"`
-	ComplianceRate  float64               `json:"compliance_rate"`
-	Issues          []FormatIssue         `json:"issues"`
-	FormatComparison *FormatComparison    `json:"format_comparison"`
-	ContentComparison *ContentComparison  `json:"content_comparison"`
-	StyleComparison *StyleComparison      `json:"style_comparison"`
-	Recommendations []Recommendation      `json:"recommendations"`
-	Summary         ComparisonSummary     `json:"summary"`
+	DocumentPath         string                `json:"document_path"`
+	TemplatePath         string                `json:"template_path"`
+	AnnotatedDocumentPath string               `json:"annotated_document_path"`
+	OverallScore         float64               `json:"overall_score"`
+	ComplianceRate       float64               `json:"compliance_rate"`
+	Issues               []types.FormatIssue   `json:"issues"`
+	FormatComparison     *FormatComparison    `json:"format_comparison"`
+	ContentComparison    *ContentComparison  `json:"content_comparison"`
+	StyleComparison      *StyleComparison      `json:"style_comparison"`
+	Recommendations      []Recommendation      `json:"recommendations"`
+	Summary              ComparisonSummary     `json:"summary"`
 }
 
-// FormatIssue 格式问题
-type FormatIssue struct {
-	ID          string      `json:"id"`
-	Type        IssueType   `json:"type"`
-	Severity    Severity    `json:"severity"`
-	Location    string      `json:"location"`
-	Description string      `json:"description"`
-	Current     interface{} `json:"current"`
-	Expected    interface{} `json:"expected"`
-	Rule        string      `json:"rule"`
-	Suggestions []string    `json:"suggestions"`
-}
+// 使用types包中的FormatIssue，删除重复定义
 
 // IssueType 问题类型
 type IssueType string
@@ -79,7 +69,7 @@ type FormatComparison struct {
 	PageRules      []RuleComparison `json:"page_rules"`
 	StyleRules     []RuleComparison `json:"style_rules"`
 	Score          float64          `json:"score"`
-	Issues         []FormatIssue    `json:"issues"`
+	Issues         []types.FormatIssue    `json:"issues"`
 }
 
 // ContentComparison 内容对比
@@ -90,7 +80,7 @@ type ContentComparison struct {
 	Footers       []ElementComparison `json:"footers"`
 	Images        []ElementComparison `json:"images"`
 	Score         float64             `json:"score"`
-	Issues        []FormatIssue       `json:"issues"`
+	Issues        []types.FormatIssue       `json:"issues"`
 }
 
 // StyleComparison 样式对比
@@ -99,7 +89,7 @@ type StyleComparison struct {
 	CharacterStyles []StyleElementComparison `json:"character_styles"`
 	TableStyles     []StyleElementComparison `json:"table_styles"`
 	Score           float64                  `json:"score"`
-	Issues          []FormatIssue            `json:"issues"`
+	Issues          []types.FormatIssue            `json:"issues"`
 }
 
 // RuleComparison 规则对比
@@ -110,7 +100,7 @@ type RuleComparison struct {
 	Compliant    bool        `json:"compliant"`
 	Score        float64     `json:"score"`
 	Differences  []Difference `json:"differences"`
-	Issues       []FormatIssue `json:"issues"`
+	Issues       []types.FormatIssue `json:"issues"`
 }
 
 // ElementComparison 元素对比
@@ -120,7 +110,7 @@ type ElementComparison struct {
 	Compliant    bool        `json:"compliant"`
 	Score        float64     `json:"score"`
 	Differences  []Difference `json:"differences"`
-	Issues       []FormatIssue `json:"issues"`
+	Issues       []types.FormatIssue `json:"issues"`
 }
 
 // StyleElementComparison 样式元素对比
@@ -131,7 +121,7 @@ type StyleElementComparison struct {
 	Compliant    bool        `json:"compliant"`
 	Score        float64     `json:"score"`
 	Differences  []Difference `json:"differences"`
-	Issues       []FormatIssue `json:"issues"`
+	Issues       []types.FormatIssue `json:"issues"`
 }
 
 // Difference 差异

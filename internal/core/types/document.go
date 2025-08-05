@@ -328,9 +328,15 @@ type LineNumbering struct {
 	Restart   bool   `json:"restart"`
 }
 
+// ParagraphStyle 段落样式
 type ParagraphStyle struct {
 	Name string `json:"name"`
 	ID   string `json:"id"`
+	// 添加字体信息
+	Font     Font       `json:"font"`
+	Alignment Alignment  `json:"alignment"`
+	Indentation Indentation `json:"indentation"`
+	Spacing Spacing    `json:"spacing"`
 }
 
 type TableStyle struct {
@@ -405,4 +411,17 @@ type StyleRule struct {
 	Linked      string `json:"linked"`
 	QuickFormat bool   `json:"quick_format"`
 	Hidden      bool   `json:"hidden"`
+}
+
+// FormatIssue 格式问题
+type FormatIssue struct {
+	ID          string      `json:"id"`
+	Type        string      `json:"type"`
+	Severity    string      `json:"severity"`
+	Location    string      `json:"location"`
+	Description string      `json:"description"`
+	Current     interface{} `json:"current"`
+	Expected    interface{} `json:"expected"`
+	Rule        string      `json:"rule"`
+	Suggestions []string    `json:"suggestions"`
 } 

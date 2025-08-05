@@ -3,7 +3,9 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
+	"docs-parser/internal/core/annotator"
 	"docs-parser/internal/utils"
 	pkgcomparator "docs-parser/pkg/comparator"
 
@@ -45,6 +47,25 @@ var compareCmd = &cobra.Command{
 
 		// 如果有格式问题，显示问题详情
 		fmt.Printf("发现 %d 个格式问题\n", len(report.Issues))
+
+		// 自动生成标注文档
+		if len(report.Issues) > 0 {
+			fmt.Println("正在生成标注文档...")
+
+			// 生成输出路径
+			ext := filepath.Ext(docPath)
+			baseName := docPath[:len(docPath)-len(ext)]
+			outputPath := baseName + "_annotated" + ext
+
+			// 使用标注器生成标注文档
+			docAnnotator := annotator.NewAnnotator()
+			err = docAnnotator.AnnotateDocument(docPath, outputPath, report.Issues)
+			if err != nil {
+				fmt.Printf("警告: 生成标注文档失败: %v\n", err)
+			} else {
+				fmt.Printf("已生成标注文档: %s\n", outputPath)
+			}
+		}
 
 		fmt.Printf("对比完成，发现 %d 个格式问题\n", len(report.Issues))
 	},

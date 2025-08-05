@@ -1,6 +1,7 @@
 package comparator
 
 import (
+	"fmt"
 	"docs-parser/internal/core/comparator"
 	"docs-parser/internal/core/types"
 )
@@ -24,6 +25,8 @@ func NewComparator() *Comparator {
 
 // CompareWithTemplate 与模板进行对比
 func (c *Comparator) CompareWithTemplate(docPath, templatePath string) (*comparator.ComparisonReport, error) {
+	fmt.Printf("DEBUG: pkg/comparator 开始比较文档\n")
+	
 	// 获取默认对比器
 	comparator, err := c.factory.GetComparator("default")
 	if err != nil {
@@ -31,7 +34,13 @@ func (c *Comparator) CompareWithTemplate(docPath, templatePath string) (*compara
 	}
 
 	// 执行模板对比
-	return comparator.CompareWithTemplate(docPath, templatePath)
+	report, err := comparator.CompareWithTemplate(docPath, templatePath)
+	if err != nil {
+		return nil, err
+	}
+	
+	fmt.Printf("DEBUG: pkg/comparator 比较完成，发现 %d 个问题\n", len(report.Issues))
+	return report, nil
 }
 
 // CompareDocuments 对比两个文档
@@ -55,7 +64,7 @@ func (c *Comparator) CompareFormatRules(docRules, templateRules *types.FormatRul
 	}
 
 	// 执行格式规则对比
-	return comparator.CompareFormatRules(docRules, templateRules)
+	return comparator.CompareFormatRules(docRules, templateRules, nil, nil)
 }
 
 // CompareContent 对比内容

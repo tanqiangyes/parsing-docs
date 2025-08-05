@@ -499,12 +499,12 @@ func (wd *WordprocessingDocument) parseMainDocument(content []byte, doc *types.D
 				Italic: r.Properties.Italic,
 			}
 
-			// 解析字体
+			// 解析内联字体信息
 			if r.Properties.Font.Val != "" {
 				run.Font.Name = r.Properties.Font.Val
 			}
 
-			// 解析字体大小
+			// 解析内联字体大小
 			if r.Properties.Size.Val != "" {
 				if sz, err := strconv.ParseFloat(r.Properties.Size.Val, 64); err == nil {
 					run.Font.Size = sz / 2.0
@@ -512,10 +512,19 @@ func (wd *WordprocessingDocument) parseMainDocument(content []byte, doc *types.D
 				}
 			}
 
-			// 解析颜色
+			// 解析内联颜色
 			if r.Properties.Color.Val != "" {
 				run.Font.Color.RGB = r.Properties.Color.Val
 				run.Color.RGB = r.Properties.Color.Val
+			}
+
+			// 如果没有内联字体信息，尝试从段落样式中获取
+			if run.Font.Name == "" {
+				if paragraph.Style.Name != "" {
+					// 不在这里设置默认值，让applyStylesToContent来处理
+					// run.Font.Name = "宋体"
+					// run.Font.Size = 12.0
+				}
 			}
 
 			paragraph.Runs = append(paragraph.Runs, run)
@@ -672,6 +681,11 @@ func (wd *WordprocessingDocument) parseStyles(doc *types.Document) error {
 		}
 	}
 
+	// 应用样式到文档内容
+	if err := wd.applyStylesToContent(doc); err != nil {
+		return fmt.Errorf("failed to apply styles: %w", err)
+	}
+
 	return nil
 }
 
@@ -700,9 +714,23 @@ func (wd *WordprocessingDocument) parseStylesXML(doc *types.Document) error {
 			} `xml:"link"`
 			Properties struct {
 				Font struct {
-					Name string `xml:"name,attr"`
-					Size string `xml:"size,attr"`
+					Ascii    string `xml:"ascii,attr"`
+					HAnsi    string `xml:"hAnsi,attr"`
+					EastAsia string `xml:"eastAsia,attr"`
+					CS       string `xml:"cs,attr"`
 				} `xml:"rFonts"`
+				Size struct {
+					Val string `xml:"val,attr"`
+				} `xml:"sz"`
+				Color struct {
+					Val string `xml:"val,attr"`
+				} `xml:"color"`
+				Bold struct {
+					Val string `xml:"val,attr"`
+				} `xml:"b"`
+				Italic struct {
+					Val string `xml:"val,attr"`
+				} `xml:"i"`
 				Paragraph struct {
 					Alignment struct {
 						Val string `xml:"val,attr"`
@@ -731,9 +759,78 @@ func (wd *WordprocessingDocument) parseStylesXML(doc *types.Document) error {
 	for _, style := range stylesDoc.Styles {
 		switch style.Type {
 		case "paragraph":
+			// 提取字体信息
+			fontName := style.Properties.Font.EastAsia
+			if fontName == "" {
+				fontName = style.Properties.Font.Ascii
+			}
+			if fontName == "" {
+				fontName = "宋体" // 默认字体
+			}
+			
+			fontSize := 12.0 // 默认字体大小
+			if style.Properties.Size.Val != "" {
+				if sz, err := strconv.ParseFloat(style.Properties.Size.Val, 64); err == nil {
+					fontSize = sz / 2.0 // 转换为磅值
+				}
+			}
+			
+			// 创建字体对象
+			font := types.Font{
+				Name:  fontName,
+				Size:  fontSize,
+				Color: types.Color{RGB: style.Properties.Color.Val},
+				Bold:  style.Properties.Bold.Val == "true" || style.Properties.Bold.Val == "1",
+				Italic: style.Properties.Italic.Val == "true" || style.Properties.Italic.Val == "1",
+			}
+			
+			// 提取段落属性
+			alignment := types.Alignment("left") // 默认左对齐
+			if style.Properties.Paragraph.Alignment.Val != "" {
+				alignment = types.Alignment(style.Properties.Paragraph.Alignment.Val)
+			}
+			
+			indentation := types.Indentation{}
+			if style.Properties.Paragraph.Indentation.Left != "" {
+				if val, err := strconv.ParseFloat(style.Properties.Paragraph.Indentation.Left, 64); err == nil {
+					indentation.Left = val / 20.0 // 转换为磅值
+				}
+			}
+			if style.Properties.Paragraph.Indentation.Right != "" {
+				if val, err := strconv.ParseFloat(style.Properties.Paragraph.Indentation.Right, 64); err == nil {
+					indentation.Right = val / 20.0
+				}
+			}
+			if style.Properties.Paragraph.Indentation.First != "" {
+				if val, err := strconv.ParseFloat(style.Properties.Paragraph.Indentation.First, 64); err == nil {
+					indentation.First = val / 20.0
+				}
+			}
+			
+			spacing := types.Spacing{}
+			if style.Properties.Paragraph.Spacing.Before != "" {
+				if val, err := strconv.ParseFloat(style.Properties.Paragraph.Spacing.Before, 64); err == nil {
+					spacing.Before = val / 20.0
+				}
+			}
+			if style.Properties.Paragraph.Spacing.After != "" {
+				if val, err := strconv.ParseFloat(style.Properties.Paragraph.Spacing.After, 64); err == nil {
+					spacing.After = val / 20.0
+				}
+			}
+			if style.Properties.Paragraph.Spacing.Line != "" {
+				if val, err := strconv.ParseFloat(style.Properties.Paragraph.Spacing.Line, 64); err == nil {
+					spacing.Line = val / 240.0 // 转换为倍数
+				}
+			}
+			
 			paraStyle := types.ParagraphStyle{
 				ID:   style.ID,
 				Name: style.Name,
+				Font: font,
+				Alignment: alignment,
+				Indentation: indentation,
+				Spacing: spacing,
 			}
 			doc.Styles.ParagraphStyles = append(doc.Styles.ParagraphStyles, paraStyle)
 
@@ -882,31 +979,54 @@ func (wd *WordprocessingDocument) extractInlineFonts(doc *types.Document, fontMa
 
 	for _, para := range doc.Content.Paragraphs {
 		for _, run := range para.Runs {
-			if run.Font.Name != "" {
-				if _, exists := usedFonts[run.Font.Name]; !exists {
-					fontRule := &types.FontRule{
-						ID:     run.Font.Name,
-						Name:   run.Font.Name,
-						Size:   run.Font.Size,
-						Color:  run.Font.Color,
-						Bold:   run.Bold,
-						Italic: run.Italic,
-					}
-					usedFonts[run.Font.Name] = fontRule
-				} else {
-					// 更新现有字体规则，合并属性
-					existing := usedFonts[run.Font.Name]
-					if run.Font.Size > 0 {
-						existing.Size = run.Font.Size
-					}
-					if run.Font.Color.RGB != "" {
-						existing.Color = run.Font.Color
-					}
-					existing.Bold = existing.Bold || run.Bold
-					existing.Italic = existing.Italic || run.Italic
+			// 使用run.Font.Name，如果为空则使用默认字体
+			fontName := run.Font.Name
+			if fontName == "" {
+				fontName = "宋体" // 默认字体
+			}
+			
+			// 确保字体大小不为0
+			fontSize := run.Font.Size
+			if fontSize == 0 {
+				fontSize = 12.0 // 默认字体大小
+			}
+			
+			if _, exists := usedFonts[fontName]; !exists {
+				fontRule := &types.FontRule{
+					ID:     fontName,
+					Name:   fontName,
+					Size:   fontSize,
+					Color:  run.Font.Color,
+					Bold:   run.Bold,
+					Italic: run.Italic,
 				}
+				usedFonts[fontName] = fontRule
+			} else {
+				// 更新现有字体规则，合并属性
+				existing := usedFonts[fontName]
+				if fontSize > 0 {
+					existing.Size = fontSize
+				}
+				if run.Font.Color.RGB != "" {
+					existing.Color = run.Font.Color
+				}
+				existing.Bold = existing.Bold || run.Bold
+				existing.Italic = existing.Italic || run.Italic
 			}
 		}
+	}
+
+	// 如果没有找到字体，创建默认字体规则
+	if len(usedFonts) == 0 {
+		defaultFont := &types.FontRule{
+			ID:     "Default",
+			Name:   "宋体",
+			Size:   12.0,
+			Color:  types.Color{RGB: "000000"},
+			Bold:   false,
+			Italic: false,
+		}
+		usedFonts["Default"] = defaultFont
 	}
 
 	// 将提取的字体规则复制到fontMap
@@ -964,5 +1084,45 @@ func (wd *WordprocessingDocument) Close() error {
 	if wd.Container != nil {
 		return wd.Container.Close()
 	}
+	return nil
+}
+
+// applyStylesToContent 将样式应用到文档内容
+func (wd *WordprocessingDocument) applyStylesToContent(doc *types.Document) error {
+	// 创建样式映射
+	styleMap := make(map[string]*types.ParagraphStyle)
+	for i := range doc.Styles.ParagraphStyles {
+		styleMap[doc.Styles.ParagraphStyles[i].ID] = &doc.Styles.ParagraphStyles[i]
+	}
+
+	// 为每个段落应用样式
+	for i := range doc.Content.Paragraphs {
+		paragraph := &doc.Content.Paragraphs[i]
+		
+		// 如果段落有样式名称，应用对应的样式
+		if paragraph.Style.Name != "" {
+			if style, exists := styleMap[paragraph.Style.Name]; exists {
+				// 应用段落样式
+				paragraph.Alignment = style.Alignment
+				paragraph.Indentation = style.Indentation
+				paragraph.Spacing = style.Spacing
+				
+				// 为段落中的每个运行应用字体样式
+				for j := range paragraph.Runs {
+					run := &paragraph.Runs[j]
+					
+					// 如果没有内联字体信息，使用样式中的字体信息
+					if run.Font.Name == "" {
+						run.Font.Name = style.Font.Name
+						run.Font.Size = style.Font.Size
+						run.Font.Color = style.Font.Color
+						run.Font.Bold = style.Font.Bold
+						run.Font.Italic = style.Font.Italic
+					}
+				}
+			}
+		}
+	}
+
 	return nil
 }
