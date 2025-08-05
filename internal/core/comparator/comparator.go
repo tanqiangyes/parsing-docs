@@ -150,8 +150,10 @@ func (dc *DocumentComparator) CompareFormatRules(docRules, templateRules *types.
 	dc.compareParagraphFormats(docRules.ParagraphRules, templateRules.ParagraphRules, &comparison.Issues)
 
 	// 对比文本运行级别的字体信息（合并同一文本的多个问题）
-	fmt.Printf("DEBUG: 开始对比内容字体，文档段落数: %d, 模板段落数: %d\n", len(doc.Content.Paragraphs), len(template.Content.Paragraphs))
-	dc.compareContentFonts(&doc.Content, &template.Content, &comparison.Issues)
+	if doc != nil && template != nil {
+		fmt.Printf("DEBUG: 开始对比内容字体，文档段落数: %d, 模板段落数: %d\n", len(doc.Content.Paragraphs), len(template.Content.Paragraphs))
+		dc.compareContentFonts(&doc.Content, &template.Content, &comparison.Issues)
+	}
 
 	fmt.Printf("DEBUG: 格式对比问题数量: %d\n", len(comparison.Issues))
 	return comparison, nil

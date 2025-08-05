@@ -11,17 +11,46 @@ import (
 	"docs-parser/internal/core/types"
 )
 
-// Annotator 文档标注器
+// Annotator 文档标注器，负责在Word文档中添加格式问题的批注
+// 
+// 主要功能:
+//   - 复制原文档并添加批注
+//   - 生成详细的格式问题说明
+//   - 在指定位置插入批注引用
+//   - 创建Word兼容的批注XML结构
 type Annotator struct {
-	// 可以添加配置选项
+	// 可以添加配置选项，如批注样式、作者信息等
 }
 
-// NewAnnotator 创建新的标注器
+// NewAnnotator 创建新的文档标注器
+//
+// 返回值:
+//   - *Annotator: 新创建的标注器实例
+//
+// 示例:
+//   annotator := NewAnnotator()
 func NewAnnotator() *Annotator {
 	return &Annotator{}
 }
 
-// AnnotateDocument 标注文档
+// AnnotateDocument 标注文档，在指定文档中添加格式问题的批注
+//
+// 参数:
+//   - sourcePath: 源文档路径
+//   - outputPath: 输出文档路径
+//   - issues: 格式问题列表
+//
+// 返回值:
+//   - error: 操作结果，成功为nil
+//
+// 处理流程:
+//   1. 复制原文档到输出路径
+//   2. 如果有格式问题，添加批注
+//   3. 生成标注后的文档
+//
+// 示例:
+//   issues := []types.FormatIssue{...}
+//   err := annotator.AnnotateDocument("source.docx", "output.docx", issues)
 func (docAnnotator *Annotator) AnnotateDocument(sourcePath, outputPath string, issues []types.FormatIssue) error {
 	fmt.Printf("开始标注文档: %s -> %s\n", sourcePath, outputPath)
 
@@ -42,7 +71,19 @@ func (docAnnotator *Annotator) AnnotateDocument(sourcePath, outputPath string, i
 	return nil
 }
 
-// copyDocument 复制文档
+// copyDocument 复制文档文件
+//
+// 参数:
+//   - sourcePath: 源文件路径
+//   - outputPath: 目标文件路径
+//
+// 返回值:
+//   - error: 复制操作结果
+//
+// 错误处理:
+//   - 源文件不存在时返回错误
+//   - 目标路径无法创建时返回错误
+//   - 复制过程中出现IO错误时返回错误
 func (docAnnotator *Annotator) copyDocument(sourcePath, outputPath string) error {
 	// 读取源文件
 	sourceFile, err := os.Open(sourcePath)
@@ -67,16 +108,33 @@ func (docAnnotator *Annotator) copyDocument(sourcePath, outputPath string) error
 	return nil
 }
 
-// addAnnotations 添加批注到文档
+// addAnnotations 在文档中添加批注
+//
+// 参数:
+//   - docPath: 文档路径
+//   - issues: 格式问题列表
+//
+// 返回值:
+//   - error: 添加批注操作结果
+//
+// 处理流程:
+//   1. 打开DOCX文件作为ZIP归档
+//   2. 创建临时文件用于写入
+//   3. 复制所有文件，跳过comments.xml和rels文件
+//   4. 生成批注内容文件
+//   5. 添加批注关系文件
+//   6. 替换原文件
 func (docAnnotator *Annotator) addAnnotations(docPath string, issues []types.FormatIssue) error {
 	fmt.Printf("DEBUG: 开始添加批注，共 %d 个问题\n", len(issues))
 
+	// 打开DOCX文件作为ZIP归档
 	reader, err := zip.OpenReader(docPath)
 	if err != nil {
 		return fmt.Errorf("无法打开文档: %w", err)
 	}
 	defer reader.Close()
 
+	// 创建临时文件
 	tempPath := docPath + ".tmp"
 	tempFile, err := os.Create(tempPath)
 	if err != nil {
@@ -104,10 +162,12 @@ func (docAnnotator *Annotator) addAnnotations(docPath string, issues []types.For
 			return fmt.Errorf("处理文件 %s 失败: %w", file.Name, err)
 		}
 	}
+	
 	// 生成批注内容文件
 	if err := docAnnotator.addCommentsFile(zipWriter, issues); err != nil {
 		return fmt.Errorf("添加批注内容文件失败: %w", err)
 	}
+	
 	// 合并/添加批注关系
 	if relsContent == nil {
 		relsContent = []byte(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">\n</Relationships>`)
@@ -115,16 +175,20 @@ func (docAnnotator *Annotator) addAnnotations(docPath string, issues []types.For
 	if err := docAnnotator.addCommentsRelsFile(zipWriter, relsContent); err != nil {
 		return fmt.Errorf("添加批注关系文件失败: %w", err)
 	}
+	
 	if err := zipWriter.Close(); err != nil {
 		return fmt.Errorf("关闭zip写入器失败: %w", err)
 	}
 	tempFile.Close()
+	
+	// 替换原文件
 	if err := os.Remove(docPath); err != nil {
 		return fmt.Errorf("删除原文件失败: %w", err)
 	}
 	if err := os.Rename(tempPath, docPath); err != nil {
 		return fmt.Errorf("重命名临时文件失败: %w", err)
 	}
+	
 	fmt.Printf("DEBUG: 批注添加完成\n")
 	return nil
 }

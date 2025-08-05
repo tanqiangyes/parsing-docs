@@ -7,6 +7,7 @@ import (
 
 	"docs-parser/internal/core/annotator"
 	"docs-parser/internal/core/comparator"
+	"docs-parser/internal/core/types"
 	"docs-parser/internal/core/validator"
 	"docs-parser/internal/templates"
 	"docs-parser/pkg/parser"
@@ -95,8 +96,23 @@ func TestDocumentAnnotation(t *testing.T) {
 	// 创建标注器
 	annotator := annotator.NewAnnotator()
 
+	// 创建测试用的格式问题
+	testIssues := []types.FormatIssue{
+		{
+			ID:          "test_issue_1",
+			Type:        "font",
+			Severity:    "medium",
+			Location:    "第1段第1个文本",
+			Description: "测试格式问题",
+			Current:     map[string]interface{}{"font": "宋体"},
+			Expected:    map[string]interface{}{"font": "黑体"},
+			Rule:        "font_format",
+			Suggestions: []string{"调整字体格式"},
+		},
+	}
+
 	// 测试标注不存在的文档
-	err := annotator.AnnotateDocument("nonexistent.docx", "output.docx")
+	err := annotator.AnnotateDocument("nonexistent.docx", "output.docx", testIssues)
 	if err == nil {
 		t.Error("应该返回错误，因为源文档不存在")
 	}
